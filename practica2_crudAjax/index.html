@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]>      <html class="no-js"> <!--<![endif]-->
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title></title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+        crossorigin="anonymous"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+</head>
+
+<body>
+    <div class="main-content container vh-100 d-flex pt-3  flex-column align-items-center">
+
+        <h1>CRUD con AJAX</h1>
+
+        <div class="controls-container">
+
+            <div class="control-group selector-group pt-3">
+                <label for="selector" class="form-label">Mostrar Datos:</label>
+                <select class="form-select" id="selector" aria-label="Selección de tabla a mostrar">
+                    <option value="none">Selecciona una opción</option>
+                    <option value="ejecutivo">Ejecutivos</option>
+                    <option value="cita">Citas</option>
+                </select>
+            </div>
+
+            <div class="control-group search-group pt-3">
+                <label for="search-input" class="form-label">Búsqueda:</label>
+                <input type="text" class="form-input" id="search-input" placeholder="nombre / teléfono / id"
+                    aria-label="Criterio de búsqueda por nombre, teléfono o ID" />
+            </div>
+
+        </div>
+        <div class="insert-ejecutivo visually-hidden d-flex flex-column align-items-center pt-3">
+            <h2>Insertar Ejecutivo</h2>
+            <form id="form-insert-ejecutivo">
+                <table class="table table-striped table-hover table-bordered caption-top">
+                    <thead>
+                        <tr class="insert-row">
+                            <td></td>
+                            <td>
+                                <input type="text" id="nombre-ejecutivo-input" name="nom_eje"
+                                    class="form-control form-control-sm" placeholder="Nombre" required>
+                            </td>
+                            <td>
+                                <input type="tel" id="telefono-ejecutivo-input" name="tel_eje"
+                                    class="form-control form-control-sm" placeholder="Teléfono" required>
+                            </td>
+                            <td colspan="2">
+                                <button type="submit" id="agregar-ejecutivo-btn" class="btn btn-primary btn-sm w-100">
+                                    Agregar Ejecutivo
+                                </button>
+                            </td>
+                        </tr>
+                    </thead>
+                </table>
+            </form>
+        </div>
+        <table class="table table-ejecutivo table-striped table-hover table-bordered caption-top pt-3 visually-hidden">
+            <thead>
+                <tr>
+                    <th scope="row">Id</th>
+                    <th scope="row">Nombre</th>
+                    <th scope="row">Teléfono</th>
+                    <th scope="row">Eliminar</th>
+                    <th scope="row">Editar</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <th scope="row">Id</th>
+                    <th scope="row">Nombre</th>
+                    <th scope="row">Teléfono</th>
+                    <th scope="row">Eliminar</th>
+                    <th scope="row">Editar</th>
+                </tr>
+            </tbody>
+        </table>
+        <div class="insert-cita visually-hidden d-flex flex-column align-items-center pt-3">
+            <h2>Insertar Cita</h2>
+            <form id="form-insert-cita">
+                <table class="table table-striped table-hover table-bordered caption-top">
+                    <thead>
+                        <tr class="insert-row">
+                            <td></td>
+                            <td>
+                                <input type="text" id="nombre-cita-input" name="nom_cita"
+                                    class="form-control form-control-sm" placeholder="Nombre de la Cita" required>
+                            </td>
+                            <td>
+                                <input type="text" id="ejecutivo-cita-input" name="id_eje"
+                                    class="form-control form-control-sm" placeholder="ID Ejecutivo" required>
+                            </td>
+                            <td colspan="2">
+                                <button type="submit" id="agregar-cita-btn" class="btn btn-primary btn-sm w-100">
+                                    Agregar Cita
+                                </button>
+                            </td>
+                        </tr>
+                    </thead>
+                </table>
+            </form>
+        </div>
+        <table class="table table-cita table-striped table-hover table-bordered caption-top pt-3 visually-hidden">
+            <thead>
+                <tr>
+                    <th scope="row">Id</th>
+                    <th scope="row">Nombre Cita</th>
+                    <th scope="row">Ejecutivo a cargo</th>
+                </tr>
+            </thead>
+            <tbody>
+
+            </tbody>
+        </table>
+    </div>
+</body>
+<script src="table.js"></script>
+
+</html>
