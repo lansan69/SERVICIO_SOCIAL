@@ -62,7 +62,7 @@ function guardarCambio(row, campo, value, id) {
             // Manejar respuesta exitosa
             if (response.success) {
                 console.log('Cita actualizada');
-                console.log(response);
+                callAjaxTemplate();
             } else {
                 console.log("error:");
                 console.log(response);
@@ -76,7 +76,7 @@ function eliminar(id) {
     ajaxGeneric("administrar-cita.php", "POST", { action: "eliminar", id_cita: id })
 }
 
-function crearRegistroVacio(rowIndex, id_cita) {
+function crearRegistroVacio(row,id_cita,prop,newValue) {
     $.ajax({
         url: "administrar-cita.php",
         type: "POST",
@@ -85,8 +85,9 @@ function crearRegistroVacio(rowIndex, id_cita) {
         success: function (response) {
             if (response.success) {
                 if (response.new_id) {
-                    hot.setDataAtCell(rowIndex, id_cita, response.new_id, 'poblar_id');
-                    hot.alter('insert_row_above', 0, 1);
+                    hot.setDataAtCell(row, id_cita, response.new_id, 'poblar_id');
+                    hot.alter('insert_row_above', 0, 1); //Insert new empty row above
+                    guardarCambio(row, prop, newValue, response.new_id); //insert the value inserted
                 }
             } else {
                 console.error(response);
@@ -130,8 +131,6 @@ function processData(data) {
 
             currentValue.rango_calc = formattedTime;
         }
-
-        console.log(formattedTime);
     });
     return data;
 }
@@ -155,7 +154,6 @@ function ajax(name) {
                 ejecutivoFullMap = response.ejecutivoMap; 
                 initializeDynamicTable();
                 hot.alter('insert_row_above', 0, 1);
-                console.log(response);
             } else {
                 alert('Error al cargar datos: ' + response.message);
             }
@@ -175,11 +173,8 @@ function ajaxGeneric(url, metodo, data) {
         dataType: 'json',
         success: function (response) {
             if (response.success) {
-                console.log(response);
-                // alert("ÉXITO!!, ve la consola para ver la información");
             } else {
                 console.error(response);
-                //alert("ERROR!!, ve la consola para ver la información");
             }
         },
         error: function (jqXHR, textStatus, errorThrown) {
@@ -234,8 +229,9 @@ function initializeDynamicTable() {
 
         afterChange: function (changes, source) {
             if (!changes || source === 'loadData' || source === 'cascada_telefono' || source === 'poblar_id' || source === 'cascada_rango') return;
-
+            
             changes.forEach(([row, prop, oldValue, newValue]) => {
+                if (oldValue === newValue) return;
                 //let id = hot.getDataAtCell(row, );
                 const elements = tableSchema.map(col => col.data);
                 const index_cita = elements.indexOf('id_cita');
@@ -252,14 +248,19 @@ function initializeDynamicTable() {
                 }
                 
                 if(id==null){
-                    crearRegistroVacio(0, index_cita);
+                    if (prop !== "hora_cit" || /^\d{2}:\d{2}:\d{2}$/.test(newValue)) {
+                        crearRegistroVacio(row, index_cita, prop,newValue);
+                        console.log("creando vacío");
+                        console.log(row,prop,oldValue,newValue);
+                    }
                 }else{
-                    guardarCambio(row,prop,newValue,id);
+
                     if (prop === "hora_cit"){
                         const index_r = elements.indexOf('rango_calc');
                         hot.setDataAtCell(row,index_r, getRango(newValue), 'cascada_rango');
-                       callAjaxTemplate();
                     }
+                    guardarCambio(row,prop,newValue,id);
+
                 }
                 
             });
