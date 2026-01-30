@@ -24,24 +24,17 @@ $(document).ready(function () {
 
                 items.create.label = "Crear";
                 items.remove.label = "Eliminar";
-
-                // --- FIX STARTS HERE ---
                 items.rename.label = "Renombrar";
+
+                // Override rename to strip HTML badges before editing
                 items.rename.action = function (data) {
                     var inst = $.jstree.reference(data.reference);
                     var obj = inst.get_node(data.reference);
 
-                    // 1. Get the current full HTML (e.g., "Juan <span...>|</span> <span...>5</span>")
-                    var fullHtml = obj.text;
-
-                    // 2. Extract ONLY the name. 
-                    // We split by the first HTML tag (<) and take the first part.
-                    var plainName = fullHtml.split('<')[0].trim();
-
-                    // 3. Trigger the edit mode with the CLEAN name
+                    // Split text at HTML tag to get only the name
+                    var plainName = obj.text.split('<')[0].trim();
                     inst.edit(obj, plainName);
                 };
-                // --- FIX ENDS HERE ---
 
                 return items;
             }
@@ -58,17 +51,10 @@ $(document).ready(function () {
             });
         })
         .on("rename_node.jstree", function (e, data) {
-            // 1. Check if text actually changed
             if (data.text === data.old) return;
 
-            // 2. Sanitize just to be safe (though step 1 mostly solves it)
-            // We assume the user typed a plain name, but let's trim it.
-            let cleanName = data.text.trim();
-
-            // If for some reason HTML got in, strip it entirely
-            if (cleanName.includes('<')) {
-                cleanName = cleanName.split('<')[0].trim();
-            }
+            // Ensure no HTML tags remain in the name
+            let cleanName = data.text.includes('<') ? data.text.split('<')[0].trim() : data.text.trim();
 
             $.ajax({
                 url: API_URL,
@@ -84,28 +70,23 @@ $(document).ready(function () {
                     if (res.success && res.new_id) {
                         data.instance.set_id(data.node, res.new_id);
                     }
-                    // IMPORTANT: Refresh the tree immediately.
-                    // This reloads the PHP data, which adds the badges back to the new name.
+                    // Refresh to re-render badges/HTML from server
                     $('#arbol_ejecutivos').jstree(true).refresh();
                 }
             });
-        }) 1
+        })
         .on("delete_node.jstree", function (e, data) {
             $.ajax({ url: API_URL, type: 'POST', data: { action: 'eliminar_nodo', id: data.node.id } });
         });
 
+    // Custom handler for Badge Clicks
     $('#arbol_ejecutivos').on('click', '.badge-click', function (e) {
-        // 1. Prevent the tree from selecting/toggling the node when clicking the badge
         e.preventDefault();
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent tree node selection
 
-        // 2. Extract data from the clicked badge
         const id = $(this).data('id');
-        const scope = $(this).data('scope'); // 'padre' (White) or 'arbol' (Purple)
+        const scope = $(this).data('scope');
 
-        console.log("Badge clicked:", id, scope);
-
-        // 3. Call the function in handson.js
         if (typeof cargarCitasFiltradas === 'function') {
             cargarCitasFiltradas(id, scope);
         } else {
