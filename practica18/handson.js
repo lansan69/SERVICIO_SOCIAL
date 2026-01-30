@@ -194,8 +194,9 @@ document.addEventListener("DOMContentLoaded", function () {
             if (currentViewId) {
                 console.log("Applying Date Filter...");
                 cargarCitasFiltradas(currentViewId, currentViewScope);
+                cargarCitasFiltradas(localStorage.getItem("id_guardado"), localStorage.getItem("scope_guardado"));
             } else {
-                cargarCitasFiltradas(localStorage.getItem("id_guardado"), localStorage.getItem("scope_guardado") );
+                cargarCitasFiltradas(localStorage.getItem("id_guardado"), localStorage.getItem("scope_guardado"));
                 alert("Por favor, seleccione un indicador del árbol primero.");
             }
         });
