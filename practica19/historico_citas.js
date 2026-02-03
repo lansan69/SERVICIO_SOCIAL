@@ -2,11 +2,7 @@ var tableSchema2 = [];
 var tableData2 = [];
 var hot2;
 
-/**
- * FIXED: Combined AJAX logic to handle both inserting and fetching
- */
 function ajaxHistorico(name, type, action, dat = null) {
-    console.log(action);
     let requestData = { action: action };
     if (dat) {
         requestData = { ...requestData, ...dat };
@@ -19,56 +15,39 @@ function ajaxHistorico(name, type, action, dat = null) {
         dataType: 'json',
         success: function (response) {
             if (response.success) {
-                // IMPORTANT: If we are fetching, update variables and RENDER
                 if (action === "obtener") {
                     tableSchema2 = response.schema;
                     tableData2 = response.data;
-                    initializeDynamicTable2(); // Trigger rendering
-                }
-                else {
-                    console.log("Log guardado exitosamente");
+                    initializeDynamicTable2();
+                } else {
+                    console.log("Log saved locally");
                 }
             } else {
-                alert('Error: ' + response.message);
+                console.error('Error Historico: ' + response.message);
             }
-        },
-        error: function (jqXHR, textStatus, errorThrown) {
-            console.error("AJAX Error:", textStatus, errorThrown);
         }
     });
 }
 
-/**
- * Renders or Updates the History Table
- */
 function initializeDynamicTable2() {
     const container = document.getElementById('historico_citas');
-    if (!container) {
-        console.error("Contenedor 'historico_citas' no encontrado en el DOM");
-        return;
-    }
+    if (!container) return;
 
     const dynamicHeaders = tableSchema2.map(col => col.title);
     const dynamicColumns = tableSchema2.map(col => ({
         ...col,
-        readOnly: true // History should usually be read-only
+        readOnly: true
     }));
 
     if (hot2) {
-        // Update existing instance
-        hot2.updateSettings({
-            columns: dynamicColumns,
-            colHeaders: dynamicHeaders,
-            data: tableData2
-        });
+        hot2.updateSettings({ columns: dynamicColumns, colHeaders: dynamicHeaders, data: tableData2 });
     } else {
-        // Create new instance
         hot2 = new Handsontable(container, {
             data: tableData2,
             colHeaders: dynamicHeaders,
             columns: dynamicColumns,
             width: '100%',
-            height: '400px', // Set a height for visibility in modals
+            height: '400px',
             themeName: 'ht-theme-main-dark-auto',
             autoColumnSize: true,
             rowHeaders: true,
@@ -79,21 +58,32 @@ function initializeDynamicTable2() {
     }
 }
 
-// --- Trigger Functions ---
-
 function obtenerHistorico() {
     ajaxHistorico("historico.php", "GET", "obtener");
 }
 
 function insertIntoHistorico(data) {
-    console.log(data);
+    // 1. Save to DB
     ajaxHistorico("historico.php", "POST", 'insertar', data);
-    socket.send(JSON.stringify(data));
-    showBlueToast(data.descripcion)
+
+    // 2. Broadcast via Socket
+    if (window.globalSocket && window.globalSocket.readyState === WebSocket.OPEN) {
+        const payload = {
+            action: 'notification', // Tells receiver to just show a message
+            message: data.des,      // The text to display
+            user: data.res
+        };
+        window.globalSocket.send(JSON.stringify(payload));
+    }
+
+    // 3. Show Local Toast immediately
+    if (typeof window.showBlueToast === 'function') {
+        window.showBlueToast(data.des);
+    }
 }
 
 function mostrarHistorico() {
-    obtenerHistorico(); // This now triggers initializeDynamicTable2 automatically
+    obtenerHistorico();
     const modal = document.querySelector(".container_historico");
     if (modal) modal.classList.remove("hidden");
 }
@@ -103,25 +93,11 @@ function esconder() {
     if (modal) modal.classList.add("hidden");
 }
 
-
-/**
- * Generates a structured object for the history log.
- * @param {string} usuario - Who made the change.
- * @param {string} movimiento - Type of action (e.g., 'Edición', 'Eliminación').
- * @param {number|string} id_cita - ID of the record.
- * @param {string} campo - The column name modified.
- * @param {any} oldValue - Previous value.
- * @param {any} newValue - New value.
-
- */
 function createElementHistorico(usuario, movimiento, id_cita, campo, oldValue, newValue) {
-    // Standardize null/empty displays for the description
     const oldValLog = (oldValue === null || oldValue === "") ? "Vacio" : oldValue;
     const newValLog = (newValue === null || newValue === "") ? "Vacio" : newValue;
-
-    // Build a clean, readable description
     const descripcion = `${movimiento}: El campo '${campo}' cambió de "${oldValLog}" a "${newValLog}"`;
-    
+
     return {
         res: usuario || 'Sistema',
         mov: movimiento,

@@ -1,81 +1,99 @@
-// Variable global para los datos, ya que Handsontable la usa en la inicialización
 let datos = [];
-var hot; // Variable global para la instancia de Handsontable
+var hot;
 let ejecutivoTelefonoMap = {};
 let ejecutivoName = {};
-let aux = [];
+let tableSchema = [];
+let tableData = [];
+let ejecutivoFullMap = [];
 let used_hours = [];
 
-var tableSchema = [];        // Stores column definitions (type, title, width)
-var tableData = [];          // Stores the actual rows
-var ejecutivoFullMap = [];
+// --- 1. SOCKET LISTENER LOGIC ---
+window.applySocketChange = function (data) {
+    if (!hot) return;
 
-const contextMenuSettings = {
-    items: {
-        row_above: {
-            name: 'Insertar columna arriba', // Set custom text for predefined option
-        },
-        sp1: '---------',
-        row_below: {
-            name: 'Insertar columna abajo', // Set custom text for predefined option
-        },
-        sp1: '---------',
-        remove_row: {
-            name: 'Eliminar', // Set custom text for predefined option
-        },
-        "historico_cambios": {
-            name: "Histórico de cambios",
-            callback: function (key, selection, clickEvent) {
-                alert("called");
-            }
+    const allData = hot.getData();
+    const idColumnIndex = tableSchema.findIndex(col => col.data === 'id_cita');
+
+    let targetRow = -1;
+    // Find row by ID
+    for (let i = 0; i < allData.length; i++) {
+        if (allData[i][idColumnIndex] == data.id_cita) {
+            targetRow = i;
+            break;
         }
-    },
+    }
+
+    if (targetRow !== -1) {
+        const targetCol = tableSchema.findIndex(col => col.data === data.field);
+        if (targetCol !== -1) {
+            // Update cell (Source 'socket' prevents loops)
+            hot.setDataAtCell(targetRow, targetCol, data.value, 'socket');
+            // Illuminate
+            highlightCell(targetRow, targetCol);
+        }
+    }
 };
 
-function processNombres() {
-    // Devuelve un array de solo los valores (Nombres del Ejecutivo)
-    return Object.values(ejecutivoName);
+function highlightCell(row, col) {
+    hot.setCellMeta(row, col, 'className', 'cell-updated');
+    hot.render();
+    setTimeout(() => {
+        hot.setCellMeta(row, col, 'className', '');
+        hot.render();
+    }, 1000);
 }
 
+// --- 2. HELPERS & DATA ---
+function processNombres() { return Object.values(ejecutivoName); }
 function crearMapeoInverso() {
     ejecutivoIDMap = {};
-    for (const id in ejecutivoName) {
-        // Mapeo: Nombre (ej: 'Juan Pérez') -> ID (ej: 1)
-        ejecutivoIDMap[ejecutivoName[id]] = id;
-    }
+    for (const id in ejecutivoName) ejecutivoIDMap[ejecutivoName[id]] = id;
+}
+function get_Ejecutivo_ID(nombreEjecutivo) { return ejecutivoIDMap[nombreEjecutivo]; }
+
+function getRango(hour) {
+    if (!hour) return "";
+    let rawHour = parseInt(hour.split(':')[0]);
+    let ampm = rawHour >= 12 ? "PM" : "AM";
+    let displayHour = rawHour % 12;
+    displayHour = displayHour === 0 ? 12 : displayHour;
+    return displayHour + " " + ampm;
 }
 
-function get_Ejecutivo_ID(nombreEjecutivo) {
-    // Busca el ID numérico usando el nombre seleccionado como clave
-    // Nota: El valor devuelto será un string, pero el backend lo maneja.
-    return ejecutivoIDMap[nombreEjecutivo];
+function processData(data) {
+    let used = [];
+    data.forEach((currentValue) => {
+        let formattedTime = getRango(currentValue.hora_cit);
+        if (!used.includes(formattedTime)) {
+            used.push(formattedTime);
+            currentValue.rango_calc = formattedTime;
+        }
+    });
+    return data;
 }
 
+function getIdByName(nameValue) {
+    const entry = Object.entries(ejecutivoFullMap).find(([id, data]) => data.name === nameValue);
+    return entry ? entry[0] : null;
+}
+
+function randonEjecutivo() {
+    const keys = Object.keys(ejecutivoFullMap);
+    if (keys.length === 0) return null;
+    return ejecutivoFullMap[keys[Math.floor(Math.random() * keys.length)]].name;
+}
+
+// --- 3. MAIN AJAX & LOGIC ---
 function guardarCambio(row, campo, oldValue, value, id) {
-    // Llamada AJAX para guardar cambio en cita
     $.ajax({
-        url: 'administrar-cita.php',  // Endpoint del controlador de citas
-        type: 'POST',  // Método HTTP
-        data: {
-            action: 'modificar',
-            campo: campo,  // Campo de BD a actualizar
-            valor: value,  // Nuevo valor
-            id_cit: id  // ID de la cita
-        },
-        dataType: 'json',  // Esperamos respuesta JSON
+        url: 'administrar-cita.php', type: 'POST', dataType: 'json',
+        data: { action: 'modificar', campo: campo, valor: value, id_cit: id },
         success: function (response) {
-            // Manejar respuesta exitosa
             if (response.success) {
-
-                //insertar elemento into logs cita
                 const element = createElementHistorico(randonEjecutivo(), 'modificar', id, campo, oldValue, value);
-                insertIntoHistorico(element);
-
+                insertIntoHistorico(element); // Defined in historico.js
                 console.log('Cita actualizada');
-                callAjaxTemplate();
             } else {
-                console.log("error:");
-                console.log(response);
                 alert('Error: ' + response.message);
             }
         }
@@ -88,174 +106,84 @@ function eliminar(id) {
 
 function crearRegistroVacio(row, id_cita, prop, oldValue, newValue) {
     $.ajax({
-        url: "administrar-cita.php",
-        type: "POST",
+        url: "administrar-cita.php", type: "POST", dataType: 'json',
         data: { action: "agregar_vacio" },
-        dataType: 'json',
         success: function (response) {
-            if (response.success) {
-                if (response.new_id) {
-                    hot.setDataAtCell(row, id_cita, response.new_id, 'poblar_id');
-                    hot.alter('insert_row_above', 0, 1); //Insert new empty row above
-                    guardarCambio(row, prop, oldValue, newValue, response.new_id); //insert the value inserted
+            if (response.success && response.new_id) {
+                hot.setDataAtCell(row, id_cita, response.new_id, 'poblar_id');
+                hot.alter('insert_row_above', 0, 1);
+                guardarCambio(row, prop, oldValue, newValue, response.new_id);
 
-                    //Agregando al log de cambios
-                    const element = createElementHistorico(randonEjecutivo(), "agregar", response.new_id, prop, oldValue, newValue);
-                    insertIntoHistorico(element);
-                }
-            } else {
-                console.error(response);
-                //alert("ERROR!!, ve la consola para ver la información");
+                const element = createElementHistorico(randonEjecutivo(), "agregar", response.new_id, prop, oldValue, newValue);
+                insertIntoHistorico(element);
             }
-        },
-        error: function (jqXHR, textStatus, errorThrown) {
-            console.error("AJAX Error:", textStatus, errorThrown);
-            alert("ERROR de conexión o servidor, revisa la consola.");
         }
     });
-}
-
-function callAjaxTemplate() {
-    ajax("administrar-cita.php");
-}
-
-let used = []
-function getRango(hour) {
-    let rawHour = parseInt(hour.split(':')[0]);
-    let ampm = rawHour >= 12 ? "PM" : "AM";
-
-    let displayHour = rawHour % 12;
-    displayHour = displayHour === 0 ? 12 : displayHour;
-
-    const formattedTime = displayHour + " " + ampm;
-
-    return formattedTime;
-}
-
-function processData(data) {
-    let used = []; // Ensure 'used' is initialized if not global
-
-    data.forEach((currentValue, index) => {
-        // 1. Extract the hour correctly
-        let formattedTime = getRango(currentValue.hora_cit);
-
-        // 3. Only populate the cell if this hour hasn't been "marked" yet
-        if (!used.includes(formattedTime)) {
-            used.push(formattedTime);
-
-            currentValue.rango_calc = formattedTime;
-        }
-    });
-    return data;
 }
 
 function ajax(name) {
-    // 1. Definir el mapeo de ID a nombre para el dropdown
-
     $.ajax({
-        url: name,
-        type: 'GET',
-        data: {
-            action: 'obtener'
-        },
-        dataType: 'json',
+        url: name, type: 'GET', dataType: 'json',
+        data: { action: 'obtener' },
         success: function (response) {
-            ejecutivoTelefonoMap = {};
-            used_hours = []
+            ejecutivoTelefonoMap = {}; used_hours = []
             if (response.success) {
                 tableSchema = response.schema;
                 tableData = processData(response.data);
                 ejecutivoFullMap = response.ejecutivoMap;
                 initializeDynamicTable();
                 hot.alter('insert_row_above', 0, 1);
-            } else {
-                alert('Error al cargar datos: ' + response.message);
-            }
-        },
-        error: function (jqXHR, textStatus, errorThrown) {
-            console.error("Fallo la llamada AJAX (Carga Inicial):", textStatus, errorThrown);
-            alert("Error de conexión con el servidor durante la carga inicial.");
+            } else { alert('Error: ' + response.message); }
         }
     });
 }
 
 function ajaxGeneric(url, metodo, data) {
     $.ajax({
-        url: url,
-        type: metodo,
-        data: data,
-        dataType: 'json',
+        url: url, type: metodo, data: data, dataType: 'json',
         success: function (response) {
             if (response.success) {
                 const element = createElementHistorico(randonEjecutivo(), data.action, data.id_cita, "cita", "visible", "eliminado");
                 insertIntoHistorico(element);
-            } else {
-                console.error(response);
             }
-        },
-        error: function (jqXHR, textStatus, errorThrown) {
-            console.error("AJAX Error:", textStatus, errorThrown);
-            alert("ERROR de conexión o servidor, revisa la consola.");
         }
     });
 }
 
+// --- 4. TABLE INITIALIZATION ---
 function initializeDynamicTable() {
     const container = document.getElementById('citas');
-    if (hot) {
-        hot.destroy();
-    }
+    if (hot) hot.destroy();
 
     const dynamicHeaders = tableSchema.map(col => col.title);
-
     const dynamicColumns = tableSchema.map(col => {
-        const columnConfig = {
-            ...col,
-            readOnly: col.readOnly || false
-        };
-        if (col.type === 'dropdown') {
-            columnConfig.visibleRows = 10;
-            columnConfig.trimDropdown = false;
-        }
-        return columnConfig;
+        let config = { ...col, readOnly: col.readOnly || false };
+        if (col.type === 'dropdown') { config.visibleRows = 10; config.trimDropdown = false; }
+        return config;
     });
 
-    // Custom Context Menu Logic
     const customContextMenu = {
         items: {
             "row_above": { name: 'Insertar fila arriba' },
-            "row_below": { name: 'Insertar fila abajo' },
             "sp1": "---------",
             "remove_row": { name: 'Eliminar Fila' },
             "sp2": "---------",
             "historico_cambios": {
                 name: "Histórico de cambios",
-                callback: function (key, selection, clickEvent) {
-                    mostrarHistorico();
-                }
+                callback: function () { if (typeof mostrarHistorico === 'function') mostrarHistorico(); }
             }
         }
     };
 
     hot = new Handsontable(container, {
-        data: tableData,
-        colHeaders: dynamicHeaders,
-        columns: dynamicColumns,
-        themeName: 'ht-theme-main-dark-auto',
-        autoColumnSize: { useHeaders: true },
-        autoRowSize: true,
-        rowHeaders: true,
-        filters: true,
-        dropdownMenu: true,
-
-        // --- APPLY THE CUSTOM MENU HERE ---
-        contextMenu: customContextMenu,
-
-        search: true,
-        licenseKey: 'non-commercial-and-evaluation',
+        data: tableData, colHeaders: dynamicHeaders, columns: dynamicColumns,
+        themeName: 'ht-theme-main-dark-auto', autoColumnSize: { useHeaders: true },
+        autoRowSize: true, rowHeaders: true, filters: true, dropdownMenu: true,
+        contextMenu: customContextMenu, search: true, licenseKey: 'non-commercial-and-evaluation',
 
         afterChange: function (changes, source) {
-            if (!changes || source === 'loadData' || source === 'cascada_telefono' || source === 'poblar_id' || source === 'cascada_rango') return;
+            // IGNORE sources: loadData, socket, etc.
+            if (!changes || ['loadData', 'socket', 'cascada_telefono', 'poblar_id', 'cascada_rango'].includes(source)) return;
 
             changes.forEach(([row, prop, oldValue, newValue]) => {
                 if (oldValue === newValue) return;
@@ -266,10 +194,9 @@ function initializeDynamicTable() {
 
                 if (prop == "nom_eje") {
                     const id_eje = getIdByName(newValue);
-                    newValue = id_eje;
-                    prop = "id_eje2";
+                    newValue = id_eje; prop = "id_eje2";
                     const index_tel = elements.indexOf('tel_eje');
-                    this.setDataAtCell(row, index_tel, ejecutivoFullMap[id_eje].tel, 'cascada_telefono');
+                    hot.setDataAtCell(row, index_tel, ejecutivoFullMap[id_eje].tel, 'cascada_telefono');
                 }
 
                 if (id == null) {
@@ -280,8 +207,22 @@ function initializeDynamicTable() {
                     if (prop === "hora_cit") {
                         const index_r = elements.indexOf('rango_calc');
                         hot.setDataAtCell(row, index_r, getRango(newValue), 'cascada_rango');
+                        
                     }
+                    // A. Save to Database
                     guardarCambio(row, prop, oldValue, newValue, id);
+
+                    // B. Send Socket Update
+                    if (window.globalSocket && window.globalSocket.readyState === WebSocket.OPEN) {
+                        const payload = {
+                            action: 'update_cell',
+                            id_cita: id,
+                            field: prop,
+                            value: newValue,
+                            user_name: localStorage.getItem("id_sesion") || "Unknown"
+                        };
+                        window.globalSocket.send(JSON.stringify(payload));
+                    }
                 }
             });
         },
@@ -296,34 +237,16 @@ function initializeDynamicTable() {
     });
 }
 
-function getIdByName(nameValue) {
-    const entry = Object.entries(ejecutivoFullMap).find(([id, data]) => data.name === nameValue);
-    return entry ? entry[0] : null;
-}
+// Init
+ajax("administrar-cita.php");
 
-// Get the input element for searching
+// Search Listener
 const searchField = document.getElementById('search_field');
-
-searchField.addEventListener('keyup', function (event) {
-    const searchPlugin = hot.getPlugin('search');
-    const queryResult = searchPlugin.query(this.value);
-
-    hot.render();
-});
-
-
-function randonEjecutivo() {
-    const keys = Object.keys(ejecutivoFullMap);
-    const total = keys.length;
-
-    if (total === 0) return null;
-
-    const randomIndex = Math.floor(Math.random() * total);
-    const randomId = keys[randomIndex];
-    
-    
-    return ejecutivoFullMap[randomId].name;
+if (searchField) {
+    searchField.addEventListener('keyup', function (event) {
+        if (hot) {
+            hot.getPlugin('search').query(this.value);
+            hot.render();
+        }
+    });
 }
-
-// Iniciar la carga
-callAjaxTemplate();

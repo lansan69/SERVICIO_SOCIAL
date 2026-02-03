@@ -53,6 +53,54 @@
         .hidden {
             display: none;
         }
+
+        /* Toast Notifications */
+.toast-success {
+    visibility: hidden;
+    min-width: 200px;
+    background-color: #28a745;
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding: 16px;
+    position: fixed;
+    z-index: 1000;
+    right: 30px;
+    top: 30px;
+    opacity: 0;
+    transition: opacity 0.5s, top 0.5s;
+}
+
+.toast-blue {
+    visibility: hidden;
+    min-width: 250px;
+    /* Blue background with 0.8 opacity */
+    background-color: rgba(49, 202, 202, 0.9); 
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding: 16px;
+    position: fixed;
+    z-index: 1000;
+    /* Positioned slightly lower than the success toast */
+    right: 30px;
+    top: 90px; 
+    box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+    opacity: 0;
+    transition: opacity 0.5s, top 0.5s;
+}
+
+.toast-success.show, .toast-blue.show {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Cell Illumination Animation */
+.cell-updated {
+    background-color: #31caca !important;
+    color: white !important;
+    transition: background-color 0.5s ease-in-out;
+}
     </style>
 </head>
 
@@ -86,7 +134,7 @@
         </div>
     
         <div class="citas pt-3 d-flex justify-content-center align-itmes-center">
-            <div id="citas" class="shadow-sm border bg-white" style="height: 500px; width: 70%; overflow-y: scroll;">
+            <div id="citas" class="shadow-sm border bg-white" style="height: 500px; width: 100%; overflow-y: scroll;">
             </div>
         </div>
     </div>
