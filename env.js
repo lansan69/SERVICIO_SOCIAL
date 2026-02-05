@@ -1,1 +1,0 @@
-const SOCKET_URL = 'wss://socket.ahjende.com/wss/?encoding=text';
