@@ -11,7 +11,7 @@ let currentViewScope = null;
 
 let treeRenamed = false;
 
-const socket = new WebSocket('wss://socket.ahjende.com/wss/?encoding=text');
+const socket = new WebSocket(SOCKET_URL);
 const user = generateID(10);
 let isExternalAction = false;
 
@@ -571,7 +571,7 @@ socket.onmessage = (event) => {
         isTreeExternalAction = true;
         tree.create_node(parent_id, { id: node_id, text: text, type: node_type });
         isTreeExternalAction = false;
-
+        tree.refresh();
         createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
         flashTreeNode(node_id);
     }
@@ -579,9 +579,9 @@ socket.onmessage = (event) => {
         const { log, node_id } = message;
         const tree = $('#arbol_ejecutivos').jstree(true);
 
-        window.isTreeExternalAction = true;
+        isTreeExternalAction = true;
         tree.delete_node(node_id);
-        window.isTreeExternalAction = false;
+        isTreeExternalAction = false;
 
         createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
     }

@@ -11,7 +11,7 @@ var tableData = [];          // Stores the actual rows
 var ejecutivoFullMap = [];   // Maps ID -> {name, tel}
 
 // Starting the connection
-const socket = new WebSocket('wss://socket.ahjende.com/wss/?encoding=text');
+const socket = new WebSocket(SOCKET_URL);
 const user = generateID(10);
 let isExternalAction = false;
 

@@ -5,7 +5,7 @@ let maps = {};
 var tableSchema = [];
 var tableData = [];
 
-const socket = new WebSocket('wss://socket.ahjende.com/wss/?encoding=text');
+const socket = new WebSocket(SOCKET_URL);
 const user = generateID(10);
 let isExternalAction = false;
 

@@ -14,8 +14,7 @@ $(document).ready(function () {
             }
         },
         "types": {
-            "default": { "icon": "ki-outline ki-older text-warning" },
-            "file": { "icon": "ki-outline ki-file text-warning" },
+            "default": { "icon": "ki-outline ki-employee color-ejecutivo" },
             "ejecutivo": { "icon": "ki-outline ki-employee color-ejecutivo" },
             "plantel": { "icon": "ki-outline ki-escuela color-plantel" }
         },
@@ -84,19 +83,19 @@ $(document).ready(function () {
                 },
                 success: function (res) {
                     if (res.success && res.new_id) {
-                        data.instance.set_id(data.node, res.new_id);
 
+                        $('#arbol_ejecutivos').jstree(true).refresh();
                         socket.send(JSON.stringify({
                             type: 'CREAR_EJECUTIVO',
                             log: "Se creó un nuevo nodo",
                             node_id: res.new_id,
-                            parent_id: data.parent,
+                            parent_id: data.node.parent,
                             text: data.node.text,
                             node_type: data.node.type
                         }));
                     }
 
-                    if (res.success) {
+                    else if (res.success) {
                         socket.send(JSON.stringify({
                             type: 'RENOMBRAR_EJECUTIVO',
                             log: "Se renombró un ejecutivo",
@@ -108,7 +107,17 @@ $(document).ready(function () {
             });
         })
         .on("delete_node.jstree", function (e, data) {
-            $.ajax({ url: API_URL, type: 'POST', data: { action: 'eliminar_nodo', id: data.node.id } });
+            $.ajax({ url: API_URL, type: 'POST', data: { action: 'eliminar_nodo', id: data.node.id },
+                success: function (res) {
+                    if (res.success) {
+                        socket.send(JSON.stringify({
+                            type: 'ELIMINAR_EJECUTIVO',
+                            log: "Se eliminó el nodo",
+                            node_id: data.node.id
+                        }));
+                    }
+                }
+            });
         });
 
     // Custom handler for Badge Clicks
