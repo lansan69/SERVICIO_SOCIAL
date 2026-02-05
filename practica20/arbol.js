@@ -35,18 +35,27 @@ $(document).ready(function () {
         .on('loaded.jstree', function () {
             $(this).jstree('open_all');
         })
-        // NOTE: We no longer need the 'model.jstree' event to calculate ranks/medieval types.
         .on('move_node.jstree', function (e, data) {
             $.ajax({
                 url: API_URL,
                 type: 'POST',
-                data: { action: 'mover_nodo', id: data.node.id, parent_id: data.parent }
+                data: { action: 'mover_nodo', id: data.node.id, parent_id: data.parent },
+                success:function (res){
+                    if (res.success){
+                        socket.send(JSON.stringify({
+                            type: 'MOVER_EJECUTIVO',
+                            log: res.message,
+                            node_id: data.node.id,
+                            parent_id: data.parent,
+                            position: data.position,
+                        }));
+                    }
+                }
             });
         })
         .on("rename_node.jstree", function (e, data) {
             if (data.text === data.old) return;
-            // Strip out any HTML tags (like the icons) if the user edited the text
-            // This regex removes the <span...> parts so we only save the name to DB
+
             let cleanName = data.text.replace(/<[^>]*>?/gm, '').trim();
 
             $.ajax({
