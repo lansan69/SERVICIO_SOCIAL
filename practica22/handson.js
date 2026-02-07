@@ -598,8 +598,7 @@ function initializeDynamicTable() {
         if (isExternalAction || isTableLoading) return;
 
         if (key === 'comment') {
-            // Check for actual change (Strict Check)
-            if (!verificarCambioComentario(row, col, value)) {
+            if (!verificarCambioComentario(row, col, value) ) {
                 return;
             }
 
@@ -609,7 +608,6 @@ function initializeDynamicTable() {
             if (!id_cita) return;
 
             if (!value) {
-                // DELETE
                 $.ajax({
                     url: 'administrar-comentarios.php',
                     type: 'POST',
@@ -623,10 +621,8 @@ function initializeDynamicTable() {
                 }));
 
             } else {
-                // ADD / UPDATE
                 let commentText = (typeof value === 'object') ? value.value : value;
 
-                // Double check existence (optional, or rely on Upsert logic in PHP if added later)
                 let exists = verificarExistenciaComentario(prop, id_cita);
                 let action = exists ? 'modificar' : 'agregar';
 
@@ -685,14 +681,20 @@ socket.onmessage = (event) => {
 
         if (sourceIndex !== -1) {
             const visualRow = hot.toVisualRow(sourceIndex);
+
             if (visualRow !== null && visualRow !== -1) {
                 const colIndex = hot.propToCol(campo);
+
                 if (colIndex !== null && colIndex !== -1) {
-                    hot.setCellMeta(visualRow, colIndex, 'className', 'highlight-flash');
+                    const cellMeta = hot.getCellMeta(visualRow, colIndex);
+                    const previousClass = (cellMeta.className || '').replace('highlight-flash', '').trim();
+
+                    hot.setCellMeta(visualRow, colIndex, 'className', (previousClass + ' highlight-flash').trim());
                     hot.setDataAtCell(visualRow, colIndex, valor, 'loadData');
                     hot.render();
+
                     setTimeout(() => {
-                        hot.removeCellMeta(visualRow, colIndex, 'className');
+                        hot.setCellMeta(visualRow, colIndex, 'className', previousClass);
                         hot.render();
                     }, 1000);
                 }
@@ -726,14 +728,23 @@ socket.onmessage = (event) => {
                 if (infoEjecutivo) {
                     const colTel = hot.propToCol('tel_eje');
                     const colName = hot.propToCol('nom_eje');
+
+                    const metaTel = hot.getCellMeta(visualRow, colTel);
+                    const prevTel = (metaTel.className || '').replace('highlight-flash', '').trim();
+
+                    const metaName = hot.getCellMeta(visualRow, colName);
+                    const prevName = (metaName.className || '').replace('highlight-flash', '').trim();
+
                     hot.setDataAtCell(visualRow, colTel, infoEjecutivo.tel, 'cascada_telefono');
                     hot.setDataAtCell(visualRow, colName, infoEjecutivo.name, 'cascada_nombre');
-                    hot.setCellMeta(visualRow, colTel, 'className', 'highlight-flash');
-                    hot.setCellMeta(visualRow, colName, 'className', 'highlight-flash');
+
+                    hot.setCellMeta(visualRow, colTel, 'className', (prevTel + ' highlight-flash').trim());
+                    hot.setCellMeta(visualRow, colName, 'className', (prevName + ' highlight-flash').trim());
                     hot.render();
+
                     setTimeout(() => {
-                        hot.removeCellMeta(visualRow, colTel, 'className');
-                        hot.removeCellMeta(visualRow, colName, 'className');
+                        hot.setCellMeta(visualRow, colTel, 'className', prevTel);
+                        hot.setCellMeta(visualRow, colName, 'className', prevName);
                         hot.render();
                     }, 2000);
                 }
@@ -749,11 +760,17 @@ socket.onmessage = (event) => {
             const visualRow = hot.toVisualRow(sourceIndex);
             if (visualRow !== null && visualRow !== -1) {
                 const colIndex = hot.propToCol('rango_calc');
+
+                const cellMeta = hot.getCellMeta(visualRow, colIndex);
+                const previousClass = (cellMeta.className || '').replace('highlight-flash', '').trim();
+
                 hot.setDataAtCell(visualRow, colIndex, getRango(newValue), 'cascada_rango');
-                hot.setCellMeta(visualRow, colIndex, 'className', 'highlight-flash');
+
+                hot.setCellMeta(visualRow, colIndex, 'className', (previousClass + ' highlight-flash').trim());
                 hot.render();
+
                 setTimeout(() => {
-                    hot.removeCellMeta(visualRow, colIndex, 'className');
+                    hot.setCellMeta(visualRow, colIndex, 'className', previousClass);
                     hot.render();
                 }, 2000);
             }
@@ -769,7 +786,11 @@ socket.onmessage = (event) => {
 
         if (sourceIndex !== -1) {
             const visualRow = hot.toVisualRow(sourceIndex);
+
             if (visualRow !== null && visualRow !== -1) {
+                const cellMeta = hot.getCellMeta(visualRow, col);
+                const previousClass = (cellMeta.className || '').replace('highlight-flash', '').trim();
+
                 const plugin = hot.getPlugin('comments');
                 if (comment) {
                     plugin.setCommentAtCell(visualRow, col, comment.value);
@@ -778,10 +799,12 @@ socket.onmessage = (event) => {
                     plugin.removeCommentAtCell(visualRow, col);
                     localCommentCache[`${visualRow}_${col}`] = "";
                 }
-                hot.setCellMeta(visualRow, col, 'className', 'highlight-flash');
+
+                hot.setCellMeta(visualRow, col, 'className', (previousClass + ' highlight-flash').trim());
                 hot.render();
+
                 setTimeout(() => {
-                    hot.removeCellMeta(visualRow, col, 'className');
+                    hot.setCellMeta(visualRow, col, 'className', previousClass);
                     hot.render();
                 }, 1000);
             }
@@ -803,13 +826,11 @@ socket.onmessage = (event) => {
 
                 hot.setCellMeta(visualRow, colIndex, 'className', classToApply);
 
-                // Add Flash Effect (append class)
-                const flashClass = classToApply + ' paint-flash';
+                const flashClass = (classToApply + ' paint-flash').trim();
                 hot.setCellMeta(visualRow, colIndex, 'className', flashClass);
                 hot.render();
 
                 setTimeout(() => {
-                    // Revert to stable class
                     hot.setCellMeta(visualRow, colIndex, 'className', classToApply);
                     hot.render();
                 }, 1000);
