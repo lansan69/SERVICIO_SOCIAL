@@ -5,6 +5,10 @@ let ejecutivoName = {};
 let tableSchema = [];
 let tableData = [];
 let ejecutivoFullMap = {};
+let cellCommentsConfig = [];
+
+// NEW: Local cache to track comment state and prevent duplicate updates
+let localCommentCache = {};
 
 let currentViewId = null;
 let currentViewScope = null;
@@ -16,6 +20,8 @@ const user = generateID(10);
 let isExternalAction = false;
 
 let comentarios = [];
+
+let isTableLoading = false;
 
 const contextMenuSettings = {
     items: {
@@ -113,7 +119,6 @@ function guardarCambio(row, campo, oldValue, value, id) {
         dataType: 'json',
         success: function (response) {
             if (response.success) {
-
                 socket.send(JSON.stringify({
                     type: 'MODIFICAR_USUARIO',
                     id_cita: id,
@@ -125,13 +130,10 @@ function guardarCambio(row, campo, oldValue, value, id) {
                 const element = createElementHistorico(randonEjecutivo(), 'modificar', id, campo, oldValue, value);
                 insertIntoHistorico(element);
 
-                console.log('Cita actualizada');
-
                 if (currentViewId) {
                     cargarCitasFiltradas(currentViewId, currentViewScope);
                 }
             } else {
-                console.log("error:", response);
                 alert('Error: ' + response.message);
             }
         }
@@ -159,7 +161,6 @@ function crearRegistroVacio(row, id_cita, prop, oldValue, newValue) {
         success: function (response) {
             if (response.success) {
                 if (response.new_id) {
-
                     socket.send(JSON.stringify({
                         type: 'AGREGAR_USUARIO',
                         row: row,
@@ -176,13 +177,90 @@ function crearRegistroVacio(row, id_cita, prop, oldValue, newValue) {
                     const element = createElementHistorico(randonEjecutivo(), "agregar", response.new_id, prop, oldValue, newValue);
                     insertIntoHistorico(element);
                 }
-            } else {
-                console.error(response);
             }
         },
         error: function (jqXHR, textStatus, errorThrown) {
-            console.error("AJAX Error:", textStatus, errorThrown);
             alert("ERROR de conexión o servidor.");
+        }
+    });
+}
+
+function verificarExistenciaComentario(campo, id) {
+    var resultado = false;
+    $.ajax({
+        url: 'administrar-comentarios.php',
+        type: 'POST',
+        async: false,
+        data: {
+            action: 'validar',
+            id_cita: id,
+            id_row: campo
+        },
+        dataType: 'json',
+        success: function (response) {
+            if (response.success) {
+                resultado = true;
+            }
+        }
+    });
+    return resultado;
+}
+
+function verificarCambioComentario(row, col, newValue) {
+    const key = `${row}_${col}`;
+
+    let cleanNew = (typeof newValue === 'object' && newValue !== null) ? newValue.value : newValue;
+    cleanNew = (cleanNew === null || cleanNew === undefined) ? "" : cleanNew.toString();
+
+
+    let cleanOld = localCommentCache[key] || "";
+
+    if (cleanNew === cleanOld) {
+        return false; 
+    }
+
+    localCommentCache[key] = cleanNew;
+    return true; 
+}
+
+function obtenerComentarios() {
+    let rawComments = [];
+    $.ajax({
+        url: "administrar-comentarios.php",
+        type: 'GET',
+        async: false,
+        data: {
+            action: 'obtener'
+        },
+        dataType: 'json',
+        success: function (response) {
+            if (response.success) {
+                rawComments = response.data;
+            }
+        }
+    });
+    return rawComments;
+}
+
+function poblarComentariosHandsontable(rawComments) {
+    cellCommentsConfig = [];
+    localCommentCache = {}; // Reset 
+
+    if (!tableData || tableData.length === 0) return;
+
+    rawComments.forEach(dbComment => {
+        const rowIndex = tableData.findIndex(row => row.id_cita == dbComment.row);
+        const colIndex = tableSchema.findIndex(col => col.data === dbComment.col);
+
+        if (rowIndex !== -1 && colIndex !== -1) {
+            cellCommentsConfig.push({
+                row: rowIndex,
+                col: colIndex,
+                comment: {
+                    value: dbComment.comment
+                }
+            });
+            localCommentCache[`${rowIndex}_${colIndex}`] = dbComment.comment;
         }
     });
 }
@@ -201,12 +279,7 @@ function ajaxGeneric(url, metodo, data) {
                 if (currentViewId) {
                     cargarCitasFiltradas(currentViewId, currentViewScope);
                 }
-            } else {
-                console.error(response);
             }
-        },
-        error: function (jqXHR, textStatus, errorThrown) {
-            console.error("AJAX Error:", textStatus, errorThrown);
         }
     });
 }
@@ -217,7 +290,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (btnFilter) {
         btnFilter.addEventListener('click', function () {
             if (currentViewId) {
-                console.log("Applying Date Filter...");
                 cargarCitasFiltradas(currentViewId, currentViewScope);
                 cargarCitasFiltradas(localStorage.getItem("id_guardado"), localStorage.getItem("scope_guardado"));
             } else {
@@ -231,7 +303,6 @@ document.addEventListener("DOMContentLoaded", function () {
 function cargarCitasFiltradas(id, scope) {
     localStorage.setItem("id_guardado", id);
     localStorage.setItem("scope_guardado", scope);
-    console.log(`Cargando citas. ID: ${id}, Scope: ${scope}`);
 
     currentViewId = id;
     currentViewScope = scope;
@@ -269,6 +340,7 @@ function cargarCitasFiltradas(id, scope) {
         data: requestData,
         dataType: 'json',
         success: function (response) {
+            isTableLoading = true;
             if (response.success) {
                 tableSchema = response.schema;
                 tableData = processData(response.data);
@@ -277,17 +349,22 @@ function cargarCitasFiltradas(id, scope) {
                     ejecutivoFullMap = response.ejecutivoMap;
                 }
 
+                const rawComments = obtenerComentarios();
+                poblarComentariosHandsontable(rawComments);
+
                 initializeDynamicTable();
 
                 if (hot) {
                     hot.alter('insert_row_above', 0, 1);
                 }
+
+                setTimeout(() => {
+                    isTableLoading = false;
+                }, 100);
+
             } else {
                 alert('Error al cargar datos: ' + response.message);
             }
-        },
-        error: function (x, t, e) {
-            console.error("Error en cargarCitasFiltradas:", t, e);
         }
     });
 }
@@ -295,11 +372,13 @@ function cargarCitasFiltradas(id, scope) {
 function initializeDynamicTable() {
     const container = document.getElementById('citas');
 
+    if (hot) {
+        hot.destroy();
+        hot = null;
+    }
+    container.innerHTML = '';
+
     if (!tableData || tableData.length === 0) {
-        if (hot) {
-            hot.destroy();
-            hot = null;
-        }
         container.innerHTML = `
             <div class="d-flex flex-column justify-content-center align-items-center h-100 w-100 text-muted p-5">
                 <span class="material-icons" style="font-size: 48px; color: #ccc;">touch_app</span>
@@ -307,10 +386,6 @@ function initializeDynamicTable() {
                 <p>Seleccione una burbuja o ajuste el filtro de fechas.</p>
             </div>`;
         return;
-    }
-
-    if (!hot) {
-        container.innerHTML = '';
     }
 
     const dynamicHeaders = tableSchema.map(col => col.title);
@@ -326,133 +401,142 @@ function initializeDynamicTable() {
         return columnConfig;
     });
 
-    if (hot) {
-        hot.updateSettings({
-            columns: dynamicColumns,
-            colHeaders: dynamicHeaders,
-            data: tableData,
-            cell: comentarios
-        });
-    } else {
-        hot = new Handsontable(container, {
-            data: tableData,
-            colHeaders: dynamicHeaders,
-            columns: dynamicColumns,
-            cell: comentarios,
-            themeName: 'ht-theme-main-dark-auto',
-            autoColumnSize: { useHeaders: true },
-            autoRowSize: true,
-            rowHeaders: true,
-            filters: true,
-            comments: true,
-            dropdownMenu: true,
-            contextMenu: contextMenuSettings,
-            search: true,
-            licenseKey: 'non-commercial-and-evaluation',
+    hot = new Handsontable(container, {
+        data: tableData,
+        colHeaders: dynamicHeaders,
+        columns: dynamicColumns,
+        cell: cellCommentsConfig,
+        themeName: 'ht-theme-main-dark-auto',
+        autoColumnSize: { useHeaders: true },
+        autoRowSize: true,
+        rowHeaders: true,
+        filters: true,
+        comments: true,
+        dropdownMenu: true,
+        contextMenu: contextMenuSettings,
+        search: true,
+        licenseKey: 'non-commercial-and-evaluation',
 
-            afterChange: function (changes, source) {
-                if (!changes || source === 'loadData' || source === 'cascada_telefono' || source === 'cascada_nombre' || source === 'poblar_id' || source === 'cascada_rango') return;
+        afterChange: function (changes, source) {
+            if (isTableLoading) return;
+            if (!changes || source === 'loadData' || source === 'cascada_telefono' || source === 'cascada_nombre' || source === 'poblar_id' || source === 'cascada_rango') return;
 
-                changes.forEach(([row, prop, oldValue, newValue]) => {
-                    if (oldValue === newValue) return;
+            changes.forEach(([row, prop, oldValue, newValue]) => {
+                if (oldValue == newValue) return;
 
-                    const elements = tableSchema.map(col => col.data);
-                    const index_cita = elements.indexOf('id_cita');
-                    const id = hot.getDataAtCell(row, index_cita);
-
-                    if (prop == "nom_eje") {
-                        const id_eje = getIdByName(newValue);
-                        if (id_eje && ejecutivoFullMap[id_eje]) {
-
-                            socket.send(JSON.stringify({
-                                type: 'MODIFICAR_USUARIO_EJECUTIVO',
-                                id_cita: id,
-                                id_eje: id_eje,
-                                log: "Se asignó ejecutivo: " + newValue
-                            }));
-
-                            newValue = id_eje;
-                            prop = "id_eje2";
-                            const index_tel = elements.indexOf('tel_eje');
-                            hot.setDataAtCell(row, index_tel, ejecutivoFullMap[id_eje].tel, 'cascada_telefono');
-                        }
-                    }
-
-                    if (id == null) {
-                        if (prop !== "hora_cit" || /^\d{2}:\d{2}:\d{2}$/.test(newValue)) {
-                            crearRegistroVacio(row, index_cita, prop, oldValue, newValue);
-                        }
-                    } else {
-                        if (prop === "hora_cit") {
-                            const index_r = elements.indexOf('rango_calc');
-
-                            socket.send(JSON.stringify({
-                                type: 'MODIFICAR_USUARIO_EJECUTIVO_VALUE',
-                                id_cita: id,
-                                newValue: newValue,
-                                log: "Se modificó la hora a: " + newValue
-                            }));
-
-                            hot.setDataAtCell(row, index_r, getRango(newValue), 'cascada_rango');
-                        }
-                        if (prop !== 'rango_calc' && prop !== 'tel_eje') {
-                            guardarCambio(row, prop, oldValue, newValue, id);
-                        }
-                    }
-                });
-            },
-            beforeRemoveRow: function (index, amount, physicalRows) {
-                if (isExternalAction) return;
                 const elements = tableSchema.map(col => col.data);
-                physicalRows.forEach(rowIndex => {
-                    const id_col = elements.indexOf('id_cita');
-                    const id = hot.getDataAtCell(rowIndex, id_col);
-                    if (id) eliminar(id, rowIndex);
-                });
-            },
-            afterSetCellMeta: function (row, col, key, value) {
-                if (isExternalAction) return;
+                const index_cita = elements.indexOf('id_cita');
+                const id = hot.getDataAtCell(row, index_cita);
 
-                if (key === 'comment') {
-                    const physicalRow = this.toPhysicalRow(row);
-                    const foundIndex = comentarios.findIndex(item => item.row === physicalRow && item.col === col);
-
-                    if (value) {
-                        if (foundIndex > -1) {
-                            comentarios[foundIndex].comment = value;
-                        } else {
-                            comentarios.push({
-                                row: physicalRow,
-                                col: col,
-                                comment: value
-                            });
-                        }
-
+                if (prop == "nom_eje") {
+                    const id_eje = getIdByName(newValue);
+                    if (id_eje && ejecutivoFullMap[id_eje]) {
                         socket.send(JSON.stringify({
-                            type: 'COMENTARIO',
-                            row: physicalRow,
-                            col: col,
-                            comment: value,
-                            log: "Comentario agregado/editado"
+                            type: 'MODIFICAR_USUARIO_EJECUTIVO',
+                            id_cita: id,
+                            id_eje: id_eje,
+                            log: "Se asignó ejecutivo: " + newValue
                         }));
-
-                    } else {
-                        if (foundIndex > -1) {
-                            comentarios.splice(foundIndex, 1);
-                        }
-
-                        socket.send(JSON.stringify({
-                            type: 'COMENTARIO',
-                            row: physicalRow,
-                            col: col,
-                            comment: null,
-                            log: "Comentario eliminado"
-                        }));
+                        newValue = id_eje;
+                        prop = "id_eje2";
+                        const index_tel = elements.indexOf('tel_eje');
+                        hot.setDataAtCell(row, index_tel, ejecutivoFullMap[id_eje].tel, 'cascada_telefono');
                     }
                 }
-            },
-        });
-    }
+
+                if (id == null) {
+                    if (prop !== "hora_cit" || /^\d{2}:\d{2}:\d{2}$/.test(newValue)) {
+                        crearRegistroVacio(row, index_cita, prop, oldValue, newValue);
+                    }
+                } else {
+                    if (prop === "hora_cit") {
+                        const index_r = elements.indexOf('rango_calc');
+                        socket.send(JSON.stringify({
+                            type: 'MODIFICAR_USUARIO_EJECUTIVO_VALUE',
+                            id_cita: id,
+                            newValue: newValue,
+                            log: "Se modificó la hora a: " + newValue
+                        }));
+                        hot.setDataAtCell(row, index_r, getRango(newValue), 'cascada_rango');
+                    }
+                    if (prop !== 'rango_calc' && prop !== 'tel_eje') {
+                        guardarCambio(row, prop, oldValue, newValue, id);
+                    }
+                }
+            });
+        },
+        beforeRemoveRow: function (index, amount, physicalRows) {
+            if (isExternalAction || isTableLoading) return;
+            const elements = tableSchema.map(col => col.data);
+            physicalRows.forEach(rowIndex => {
+                const id_col = elements.indexOf('id_cita');
+                const id = hot.getDataAtCell(rowIndex, id_col);
+                if (id) eliminar(id, rowIndex);
+            });
+        }
+    });
+
+    hot.addHook('afterSetCellMeta', function (row, col, key, value) {
+        if (isExternalAction || isTableLoading) return;
+
+        if (key === 'comment') {
+            if (!verificarCambioComentario(row, col, value) && value) {
+                return; 
+            }
+
+            const prop = hot.colToProp(col);
+            const id_cita = hot.getDataAtRowProp(row, 'id_cita');
+
+            if (!id_cita) return;
+
+            if (!value) {
+                $.ajax({
+                    url: 'administrar-comentarios.php',
+                    type: 'POST',
+                    data: {
+                        action: 'eliminar',
+                        id_cita: id_cita,
+                        id_row: prop
+                    }
+                });
+
+                socket.send(JSON.stringify({
+                    type: 'COMENTARIO',
+                    row: row,
+                    col: col,
+                    comment: null,
+                    id_cita: id_cita,
+                    log: "Comentario eliminado"
+                }));
+
+            } else {
+                // UPDATE / ADD
+                let commentText = (typeof value === 'object') ? value.value : value;
+                let exists = verificarExistenciaComentario(prop, id_cita);
+                let action = exists ? 'modificar' : 'agregar';
+
+                $.ajax({
+                    url: 'administrar-comentarios.php',
+                    type: 'POST',
+                    data: {
+                        action: action,
+                        id_cita: id_cita,
+                        id_row: prop,
+                        comentario: commentText
+                    }
+                });
+
+                socket.send(JSON.stringify({
+                    type: 'COMENTARIO',
+                    row: row,
+                    col: col,
+                    comment: { value: commentText },
+                    id_cita: id_cita,
+                    log: "Comentario " + action
+                }));
+            }
+        }
+    });
 }
 
 socket.onopen = function () {
@@ -492,7 +576,6 @@ socket.onmessage = (event) => {
                     hot.setDataAtCell(visualRow, colIndex, valor, 'loadData');
                     hot.render();
 
-
                     setTimeout(() => {
                         const currentVisualRow = hot.toVisualRow(sourceIndex);
                         if (currentVisualRow !== null && currentVisualRow !== -1) {
@@ -524,16 +607,15 @@ socket.onmessage = (event) => {
         if (currentViewId) {
             cargarCitasFiltradas(currentViewId, currentViewScope);
         }
+        isExternalAction = false;
 
     } else if (message.type === "MODIFICAR_USUARIO_EJECUTIVO") {
         const { id_cita, id_eje, log } = message;
-
         const rowData = hot.getSourceData();
         const sourceIndex = rowData.findIndex(row => row.id_cita == id_cita);
 
         if (sourceIndex !== -1) {
             const visualRow = hot.toVisualRow(sourceIndex);
-
             if (visualRow !== null && visualRow !== -1) {
                 const infoEjecutivo = ejecutivoFullMap[id_eje];
                 if (infoEjecutivo) {
@@ -561,7 +643,6 @@ socket.onmessage = (event) => {
 
     } else if (message.type === "MODIFICAR_USUARIO_EJECUTIVO_VALUE") {
         const { id_cita, newValue, log } = message;
-
         const rowData = hot.getSourceData();
         const sourceIndex = rowData.findIndex(row => row.id_cita == id_cita);
 
@@ -569,9 +650,7 @@ socket.onmessage = (event) => {
             const visualRow = hot.toVisualRow(sourceIndex);
             if (visualRow !== null && visualRow !== -1) {
                 const colIndex = hot.propToCol('rango_calc');
-
                 hot.setDataAtCell(visualRow, colIndex, getRango(newValue), 'cascada_rango');
-
                 hot.setCellMeta(visualRow, colIndex, 'className', 'highlight-flash');
                 hot.render();
 
@@ -588,7 +667,6 @@ socket.onmessage = (event) => {
     }
     else if (message.type === 'MOVER_EJECUTIVO') {
         const { log, node_id, parent_id, position } = message;
-
         const tree = $('#arbol_ejecutivos').jstree(true);
         tree.move_node(node_id, parent_id, position, function () {
             createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
@@ -598,18 +676,15 @@ socket.onmessage = (event) => {
     else if (message.type === 'RENOMBRAR_EJECUTIVO') {
         const { log, node_id, value } = message;
         const tree = $('#arbol_ejecutivos').jstree(true);
-
         isTreeExternalAction = true;
         tree.rename_node(node_id, value);
         isTreeExternalAction = false;
-
         createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
         flashTreeNode(node_id);
     }
     else if (message.type === 'CREAR_EJECUTIVO') {
         const { log, node_id, parent_id, text, node_type } = message;
         const tree = $('#arbol_ejecutivos').jstree(true);
-
         isTreeExternalAction = true;
         tree.create_node(parent_id, { id: node_id, text: text, type: node_type });
         isTreeExternalAction = false;
@@ -620,52 +695,41 @@ socket.onmessage = (event) => {
     else if (message.type === 'ELIMINAR_EJECUTIVO') {
         const { log, node_id } = message;
         const tree = $('#arbol_ejecutivos').jstree(true);
-
         isTreeExternalAction = true;
         tree.delete_node(node_id);
         isTreeExternalAction = false;
-
         createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
     }
     else if (message.type === 'COMENTARIO') {
-        const { row, col, comment, log } = message;
+        const { row, col, comment, log, id_cita } = message;
         isExternalAction = true;
 
-        const foundIndex = comentarios.findIndex(item => item.row === row && item.col === col);
-        const visualRow = hot.toVisualRow(row);
+        const rowData = hot.getSourceData();
+        const sourceIndex = rowData.findIndex(r => r.id_cita == id_cita);
 
-        if (comment) {
-            if (foundIndex > -1) {
-                comentarios[foundIndex].comment = comment;
-            } else {
-                comentarios.push({
-                    row: row,
-                    col: col,
-                    comment: comment
-                });
-            }
+        if (sourceIndex !== -1) {
+            const visualRow = hot.toVisualRow(sourceIndex);
+
             if (visualRow !== null && visualRow !== -1) {
-                hot.getPlugin('comments').setCommentAtCell(visualRow, col, comment.value);
-            }
-        } else {
-            if (foundIndex > -1) {
-                comentarios.splice(foundIndex, 1);
-            }
-            if (visualRow !== null && visualRow !== -1) {
-                hot.getPlugin('comments').removeCommentAtCell(visualRow, col);
-            }
-        }
+                const plugin = hot.getPlugin('comments');
+                if (comment) {
+                    plugin.setCommentAtCell(visualRow, col, comment.value);
+                    // Update Local Cache on external change
+                    localCommentCache[`${visualRow}_${col}`] = comment.value;
+                } else {
+                    plugin.removeCommentAtCell(visualRow, col);
+                    localCommentCache[`${visualRow}_${col}`] = "";
+                }
 
-        if (visualRow !== null && visualRow !== -1) {
-            hot.setCellMeta(visualRow, col, 'className', 'highlight-flash');
-            hot.render();
-
-            setTimeout(() => {
-                hot.removeCellMeta(visualRow, col, 'className');
+                hot.setCellMeta(visualRow, col, 'className', 'highlight-flash');
                 hot.render();
-            }, 1000);
-        }
 
+                setTimeout(() => {
+                    hot.removeCellMeta(visualRow, col, 'className');
+                    hot.render();
+                }, 1000);
+            }
+        }
         isExternalAction = false;
         createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
     }
