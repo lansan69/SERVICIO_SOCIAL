@@ -419,7 +419,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 });
 
+cargarCitasFiltradas(1000,"padre");
+
 function cargarCitasFiltradas(id, scope) {
+    console.log("scope: ", scope);
     localStorage.setItem("id_guardado", id);
     localStorage.setItem("scope_guardado", scope);
 
@@ -593,12 +596,11 @@ function initializeDynamicTable() {
         }
     });
 
-    // Add Hook AFTER initialization to prevent startup errors
     hot.addHook('afterSetCellMeta', function (row, col, key, value) {
         if (isExternalAction || isTableLoading) return;
 
         if (key === 'comment') {
-            if (!verificarCambioComentario(row, col, value) ) {
+            if (!verificarCambioComentario(row, col, value) && value) {
                 return;
             }
 
@@ -625,6 +627,7 @@ function initializeDynamicTable() {
 
                 let exists = verificarExistenciaComentario(prop, id_cita);
                 let action = exists ? 'modificar' : 'agregar';
+                let comment_aux = exists ? 'modificado' : 'agregado';
 
                 $.ajax({
                     url: 'administrar-comentarios.php',
@@ -642,7 +645,7 @@ function initializeDynamicTable() {
                     row: row, col: col,
                     comment: { value: commentText },
                     id_cita: id_cita,
-                    log: "Comentario " + action
+                    log: "Comentario " + comment_aux
                 }));
             }
         }
@@ -780,6 +783,7 @@ socket.onmessage = (event) => {
     } else if (message.type === 'COMENTARIO') {
         const { row, col, comment, log, id_cita } = message;
         isExternalAction = true;
+        createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
 
         const rowData = hot.getSourceData();
         const sourceIndex = rowData.findIndex(r => r.id_cita == id_cita);
@@ -810,7 +814,6 @@ socket.onmessage = (event) => {
             }
         }
         isExternalAction = false;
-        createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
 
     } else if (message.type === 'PINTAR_CELDA') {
         const { id_cita, col_prop, color_class, log } = message;
