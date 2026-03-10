@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jsTree with Google Fonts</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.2.1/themes/default/style.min.css" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/styles/handsontable.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/styles/ht-theme-main.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/themes/default/style.min.css" />
+    <link rel="stylesheet" href="practica.css" />
+
+
+    <style>
+        .highlight-flash {
+            background-color: #d4edda !important;
+            color: #155724 !important;
+            /* Yellow highlight */
+            transition: all 1s ease-in-out;
+        }
+
+        .highlight-tree-flash {
+            background-color: #d4edda !important;
+            ;
+
+        }
+
+        .dialog-connected {
+            /* Position it top-right as a notification */
+            position: fixed;
+            top: 20px;
+            right: 20px;
+
+            /* Reset default borders and add styling */
+            border: none;
+            border-radius: 8px;
+            padding: 1rem;
+            background-color: rgb(79, 192, 79);
+
+            /* Ensure it stays on top of Handsontable */
+            z-index: 2000;
+        }
+
+        .dialog-message {
+            /* Position it top-right as a notification */
+            position: fixed;
+            top: 20px;
+            right: 20px;
+
+            /* Reset default borders and add styling */
+            border: none;
+            border-radius: 8px;
+            padding: 1rem;
+            background-color: rgb(79, 192, 177);
+
+            /* Ensure it stays on top of Handsontable */
+            z-index: 2000;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main-wrapper">
+        <aside class="tree-sidebar shadow-sm">
+            <h5 class="mb-3 fw-bold text-primary">
+                <span class="material-icons align-middle">account_tree</span> Organigrama
+            </h5>
+            <hr>
+            <div id="arbol_ejecutivos">
+                <div class="text-center text-muted mt-5">Cargando árbol...</div>
+            </div>
+        </aside>
+
+        <main class="content-area">
+            <div class="header-section text-center">
+                <h2 class="fw-bold text-dark">Gestión de Citas</h2>
+                <p class="text-muted">Seleccione un indicador en el árbol para ver las citas.</p>
+            </div>
+
+            <div class="d-flex justify-content-center align-items-center gap-3 mb-3">
+
+                <div class="d-flex align-items-center gap-2">
+                    <label for="startDate" class="fw-bold text-secondary">Tipo de ejecutivo:</label>
+                    <select class="form-control form-control-sm shadow-sm" id="tipoEjecutivo">
+                        <option value="">Ambos</option>
+                        <option value="Administrativo">Administrativo</option>
+                        <option value="Admisión">Admisión</option>
+                    </select>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <label for="startDate" class="fw-bold text-secondary">Desde:</label>
+                    <input type="date" id="startDate" class="form-control form-control-sm shadow-sm"
+                        style="width: auto;">
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <label for="endDate" class="fw-bold text-secondary">Hasta:</label>
+                    <input type="date" id="endDate" class="form-control form-control-sm shadow-sm" style="width: auto;">
+                </div>
+
+                <button id="btnFilterDate" class="btn btn-primary btn-sm shadow-sm d-flex align-items-center">
+                    <span class="material-icons me-1" style="font-size: 16px;"></span>
+                    Filtrar
+                </button>
+            </div>
+
+            <div class="embudo d-flex flex-row gap-3">
+                <div class="embudo-data">
+                    <div class="embudo-data-total-citas" id="embudo-data-total-citas"></div>
+                    <div class="embudo-data-citas-efectivas" id="embudo-data-citas-efectivas"></div>
+                    <div class="embudo-data-registros" id="embudo-data-registros"></div>
+                </div>
+                <div class="embudo-grafica" style="flex-grow: 1; height: 200px; min-width: 300px; position: relative;">
+                    <canvas id="embudoChart"></canvas>
+                </div>
+            </div>
+            <div class="d-flex flex-row gap-3">
+                <div class="status-count d-flex flex-column gap-2">
+                    <label class="fw-bold text-secondary">Conteo de status: </label>
+                    <div class="content" id="conteo-estatus"></div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-row gap-3">
+                <div class="status-count d-flex flex-column gap-2">
+                    <label class="fw-bold text-secondary">Conteo de efectividad: </label>
+                    <div class="content" id="conteo-estatus-efectividad"></div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div id="citas" class="ht-theme-main"></div>
+            </div>
+        </main>
+    </div>
+</body>
+
+<dialog id="myDialog" class="dialog-connected">
+    <p id="dialogMessage"></p>
+</dialog>
+
+<dialog id="messageDialogo" class="dialog-message">
+    <p id="dialogMessage2"></p>
+</dialog>
+
+
+<script src="../env.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+<script async src="historico_citas.js"></script>
+<script async src="handson.js"></script>
+<script src="arbol.js"></script>
+
+</html>
