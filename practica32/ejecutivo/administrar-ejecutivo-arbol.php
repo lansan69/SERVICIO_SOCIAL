@@ -15,9 +15,9 @@
  */
 
 // importar archivos necesarios
-require 'con.php';
-require 'template.php';
-require 'querys.php';
+require '../server/con.php';
+require '../utils/template.php';
+require '../utils/querys.php';
 
 header('Content-Type: application/json');
 
@@ -27,13 +27,20 @@ $childrenMap = [];
 $listaEjecutivos = [];
 
 // Obtenemos todos los ejecutivos activos para construir un mapa de información y relaciones.
-$sql_executives = "SELECT * FROM ejecutivo WHERE eli_eje = 1";
+$tipoEjecutivo = isset($_REQUEST["tipo"]) ?  mysqli_real_escape_string($connection, $_REQUEST['tipo']) : '';
+$sql_executives = '';
+if ($tipoEjecutivo == '') {
+    $sql_executives = "SELECT * FROM ejecutivo WHERE eli_eje = 1";
+} else {
+    $sql_executives = "SELECT * FROM ejecutivo WHERE eli_eje = 1 AND rol_eje = '$tipoEjecutivo'";
+}
 $raw_executives = query($sql_executives, $connection);
 
 // Construimos dos mapas:
 // 1. $ejecutivoMap: Clave = id_eje, Valor = ['name' => nom_eje, 'tel' => tel_eje, 'plantel' => id_pla, 'citas' => count de citas directas, 'padre' => id_padre]
 // 2. $childrenMap: Clave = id_eje (padre), Valor = [id_eje1, id_eje2, ...] (hijos)
 if (is_array($raw_executives)) {
+
     foreach ($raw_executives as $executive) {
 
         $nombre = isset($executive['nom_eje']) ? $executive['nom_eje'] : "";
@@ -43,12 +50,21 @@ if (is_array($raw_executives)) {
         $padre = isset($executive['id_padre']) ? $executive['id_padre'] : "";
 
         $listaEjecutivos[] = $nombre;
+        $sql_citas = '';
 
-        $sql_citas = "SELECT COUNT(id_cita) as citas
-        FROM cita
-        WHERE id_eje2 = $id AND is_active = '1'";
-        $res_citas = query($sql_citas, $connection);
-        $citas_count = (isset($res_citas[0]['citas'])) ? (int) $res_citas[0]['citas'] : 0;
+        if($tipoEjecutivo != ''){
+            $sql_citas = "SELECT COUNT(id_cita) as citas
+            FROM citaEjecutivo
+            WHERE id_eje2 = $id AND is_active = '1' AND rol_eje = '$tipoEjecutivo'";
+            $res_citas = query($sql_citas, $connection);
+            $citas_count = (isset($res_citas[0]['citas'])) ? (int) $res_citas[0]['citas'] : 0;
+        }else{
+            $sql_citas = "SELECT COUNT(id_cita) as citas
+            FROM citaEjecutivo
+            WHERE id_eje2 = $id AND is_active = '1'";
+            $res_citas = query($sql_citas, $connection);
+            $citas_count = (isset($res_citas[0]['citas'])) ? (int) $res_citas[0]['citas'] : 0;
+        }
 
         if ($id != "") {
             $ejecutivoMap[$id] = [
@@ -56,7 +72,8 @@ if (is_array($raw_executives)) {
                 'tel' => $telefono,
                 'plantel' => $plantel,
                 'citas' => $citas_count,
-                'padre' => $padre
+                'padre' => $padre,
+                'tipo' => $tipoEjecutivo,
             ];
 
             if ($padre != "" && $padre != 0) {
@@ -74,6 +91,7 @@ if (is_array($raw_executives)) {
  * * @param int|string $currentId ID del ejecutivo que se está evaluando actualmente.
  * @param array &$ejecutivoMap Referencia al mapa que contiene la info y citas base de cada ejecutivo.
  * @param array &$childrenMap Referencia al mapa que define la relación entre padres e hijos.
+ * @param string|null $tipoE Tipo de ejecutivo para filtrar (opcional).
  * @return int El número total de citas acumuladas en esa rama.
  */
 function getRecursiveCitas($currentId, &$ejecutivoMap, &$childrenMap)
@@ -105,9 +123,21 @@ switch ($action) {
      */
     case 'obtener_arbol':
         // 1. Get nodes (Executives)
-        $sql = "SELECT id_eje, nom_eje, id_padre, ejecutivo.id_pla as id_plantel, ult_eje
-        FROM ejecutivo
-        WHERE eli_eje = 1";
+        $tipoEjecutivo = isset($_REQUEST["tipo"]) ?  mysqli_real_escape_string($connection, $_REQUEST['tipo']) : '';
+
+        $sql = '';
+
+        if($tipoEjecutivo == '') {
+            $sql = "SELECT id_eje, nom_eje, id_padre, ejecutivo.id_pla as id_plantel, ult_eje, fot_eje
+            FROM ejecutivo
+            WHERE eli_eje = 1";
+        }else{
+            $sql = "SELECT id_eje, nom_eje, id_padre, ejecutivo.id_pla as id_plantel, ult_eje, fot_eje
+            FROM ejecutivo
+            WHERE eli_eje = 1
+            AND rol_eje = '$tipoEjecutivo'";
+        }
+
         $raw_data = query($sql, $connection);
 
         // 2. Get Planteles (Roots)
@@ -118,6 +148,7 @@ switch ($action) {
 
         if (is_array($raw_data)) {
             foreach ($raw_data as $row) {
+                $icon = $row['fot_eje'] ? 'ejecutivo/uploads/' . $row['fot_eje'] : 'ejecutivo/uploads/image.png';
                 $parent = ($row['id_padre'] == null || $row['id_padre'] == 0) ? $row['id_plantel'] : $row['id_padre'];
                 $id = $row['id_eje'];
 
@@ -209,7 +240,8 @@ switch ($action) {
                     'id' => $row['id_eje'],
                     'parent' => $parent,
                     'text' => $finalHtml,
-                    'type' => 'ejecutivo'
+                    'type' => 'ejecutivo',
+                    'icon' => $icon,
                 );
             }
 
@@ -245,7 +277,7 @@ switch ($action) {
                     'id' => $plantel['id_pla'],
                     'parent' => "#",
                     'text' => $plantel['nom_pla'] . $plantel_html,
-                    'type' => 'plantel'
+                    'type' => 'plantel',
                 );
             }
         }
@@ -270,6 +302,7 @@ switch ($action) {
             SET eli_eje = 0
             WHERE id_eje = $id";
 
+            // Start transaction
             mysqli_begin_transaction($connection);
             
             try {

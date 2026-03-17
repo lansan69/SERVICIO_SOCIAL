@@ -947,11 +947,11 @@ function initializeDynamicTable() {
     });
 
     //MouseUp
-    document.getElementById('tu_contenedor_handsontable').addEventListener('touchmove', function() {
+    document.getElementById('citas').addEventListener('touchmove', function() {
         clearTimeout(pressTimer);
     });
 
-    document.getElementById('tu_contenedor_handsontable').addEventListener('touchend', function() {
+    document.getElementById('citas').addEventListener('touchend', function() {
         clearTimeout(pressTimer);
     });
 

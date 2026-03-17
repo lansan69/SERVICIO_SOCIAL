@@ -2,7 +2,7 @@
 $host = "localhost";
 $user = "root";
 $pass = "";
-$database = "handsontable";
+$database = "servicio";
 $connection = mysqli_connect($host, $user, $pass, $database);
 
 if (!$connection) {

@@ -1,0 +1,35 @@
+<form id="formularioEjecutivo" enctype="multipart/form-data">
+    <div class="form-group mb-3">
+        <label>Nombre:</label>
+        <input type="text" id="nom_eje" name="nom_eje" class="form-control" required>
+    </div>
+
+    <div class="form-group mb-3">
+        <label>Teléfono:</label>
+        <input type="text" id="tel_eje" name="tel_eje" class="form-control" required>
+    </div>
+
+    <div class="form-group mb-3">
+        <label>Plantel:</label>
+        <select id="id_pla" name="id_pla" class="form-control" required>
+            <option value="">-- Seleccionar Plantel --</option>
+        </select>
+    </div>
+
+    <div class="form-group mb-3">
+        <label>Foto (opcional):</label>
+        <input type="file" id="fot_eje" name="fot_eje" class="form-control" accept=".jpg, .jpeg, .png">
+        <small class="text-muted">JPG, PNG. Máximo 40MB</small>
+    </div>
+
+    <div id="preview" class="text-center mb-3" style="display:none;">
+        <p class="text-center fw-bold text-secondar">Preview:</p>
+        <img id="img-preview" src="" style="max-width: 150px; border: 1px solid #ddd; border-radius: 4px;">
+    </div>
+
+    <div class="form-group text-end mt-4">
+        <button type="button" class="btn btn-secondary"
+            onclick="document.getElementById('formularioDialog').close()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+    </div>
+</form>

@@ -107,12 +107,14 @@ $(document).ready(function () {
             type: 'POST', 
             data: { action: 'eliminar_nodo', id: data.node.id },
             success: function (res) {
+                const nombreAsesor = "Asesor " + data.node.id;
+                hot.setDataAtCell(hot.getSourceData().findIndex(row => row.nom_eje === nombreAsesor), hot.propToCol('nom_eje'), '', 'loadData');
                 if (res.success) {
-                    $('#arbol_ejecutivos').jstree(true).refresh();
                     socket.send(JSON.stringify({
                         type: 'ELIMINAR_EJECUTIVO',
                         log: "Se eliminó el nodo",
-                        node_id: data.node.id
+                        node_id: data.node.id,
+                        nombreAsesor: nombreAsesor,
                     }));
                 }
             }

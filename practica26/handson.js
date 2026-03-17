@@ -756,6 +756,15 @@ function initializeDynamicTable() {
         autoRowSize: true,
         rowHeaders: true,
         filters: true,
+        sorting: true,
+        manualColumnMove: true,
+        manualColumnResize: true,
+        manualRowMove: true,
+        manualRowResize: true,
+        columnSorting: {
+            indicator: true,
+            headerAction: true
+        },
         comments: true,
         dropdownMenu: true,
         contextMenu: contextMenuSettings,

@@ -1,4 +1,5 @@
 let datos = [];
+let idGuardado = null; 
 
 let embudoChartInstance = null; //grafico
 
@@ -28,6 +29,19 @@ let isExternalAction = false;
 let isTableLoading = false;
 
 let comentarios = [];
+let aux = 0;
+
+document.getElementById('ejecutivoSelect').addEventListener('change', function () {
+    idGuardado = this.value;
+    console.log("Ejecutivo seleccionado:", ejecutivoFullMap[idGuardado]);
+
+    if(ejecutivoFullMap[idGuardado].permisos === 1){
+        document.getElementById('btnSeeEliminated').disabled = false;
+    }else{
+        document.getElementById('btnSeeEliminated').disabled = true;
+    }
+});
+
 
 const contextMenuSettings = {
     items: {
@@ -248,7 +262,7 @@ function updateEmbudoTotals() {
 
 function guardarCambio(row, campo, oldValue, value, id) {
     $.ajax({
-        url: 'administrar-cita.php',
+        url: 'citas/administrar-cita.php',
         type: 'POST',
         data: {
             action: 'modificar',
@@ -277,7 +291,7 @@ function guardarCambio(row, campo, oldValue, value, id) {
 }
 
 function eliminar(id, rowIndex) {
-    ajaxGeneric("administrar-cita.php", "POST", { action: "eliminar", id_cita: id });
+    ajaxGeneric("citas/administrar-cita.php", "POST", { action: "eliminar", id_cita: id });
 
     socket.send(JSON.stringify({
         usuario: user,
@@ -290,7 +304,7 @@ function eliminar(id, rowIndex) {
 
 function crearRegistroVacio(row, id_cita, prop, oldValue, newValue) {
     $.ajax({
-        url: "administrar-cita.php",
+        url: "citas/administrar-cita.php",
         type: "POST",
         data: { action: "agregar_vacio" },
         dataType: 'json',
@@ -343,7 +357,7 @@ function ajaxGeneric(url, metodo, data) {
 function verificarExistenciaComentario(campo, id) {
     var resultado = false;
     $.ajax({
-        url: 'administrar-comentarios.php',
+        url: 'citas/administrar-comentarios.php',
         type: 'POST',
         async: false,
         data: {
@@ -381,7 +395,7 @@ function verificarCambioComentario(row, col, newValue) {
 function obtenerComentarios() {
     let rawComments = [];
     $.ajax({
-        url: "administrar-comentarios.php",
+        url: "citas/administrar-comentarios.php",
         type: 'GET',
         async: false,
         data: { action: 'obtener' },
@@ -418,7 +432,7 @@ function poblarComentariosHandsontable(rawComments) {
 
 function obtenerEstilos(callback) {
     $.ajax({
-        url: "administrar-estilos.php",
+        url: "citas/administrar-estilos.php",
         type: 'GET',
         data: { action: 'obtener_estilos' },
         dataType: 'json',
@@ -575,75 +589,96 @@ function applyColorChange(row, col, colorClass) {
     hot.render();
 
     $.ajax({
-        url: 'administrar-estilos.php',
+        url: 'citas/administrar-estilos.php',
         type: 'POST',
         data: {
             action: 'guardar_estilo',
             id_cita: id_cita,
             id_col: prop,
             class: colorClass
+        },
+        success: function (response) {
+            console.log("Estilo guardado:", response);
+             socket.send(JSON.stringify({
+                type: 'PINTAR_CELDA',
+                user: user,
+                id_cita: id_cita,
+                col_prop: prop,
+                color_class: colorClass,
+                log: "Celda pintada por " + user
+            }));
+        }
+    });
+}
+
+document.getElementById('btnFilterDate').addEventListener('click', function () {
+        if (currentViewId) {
+            cargarCitasFiltradas(currentViewId, currentViewScope);
+            cargarCitasFiltradas(localStorage.getItem("id_guardado"), localStorage.getItem("scope_guardado"));
+        } else {
+            cargarCitasFiltradas(localStorage.getItem("id_guardado"), localStorage.getItem("scope_guardado"));
+            alert("Por favor, seleccione un indicador del árbol primero.");
         }
     });
 
-    socket.send(JSON.stringify({
-        type: 'PINTAR_CELDA',
-        id_cita: id_cita,
-        col_prop: prop,
-        color_class: colorClass,
-        log: "Celda pintada por " + user
-    }));
-}
-
-document.addEventListener("DOMContentLoaded", function () {
-    const btnFilter = document.getElementById('btnFilterDate');
-    if (btnFilter) {
-        btnFilter.addEventListener('click', function () {
-            if (currentViewId) {
-                cargarCitasFiltradas(currentViewId, currentViewScope);
-                cargarCitasFiltradas(localStorage.getItem("id_guardado"), localStorage.getItem("scope_guardado"));
-            } else {
-                cargarCitasFiltradas(localStorage.getItem("id_guardado"), localStorage.getItem("scope_guardado"));
-                alert("Por favor, seleccione un indicador del árbol primero.");
-            }
-        });
-    }
+document.getElementById('tipoEjecutivo').addEventListener('change', ()=>{
+        refreshTree();
+        
 });
 
-cargarCitasFiltradas(1000, "padre");
+
+//cargarCitasFiltradas(2, "padre");
+
+function insertarUsuariosIntoSelectInput(ejecutivoMap) {
+    const selectInput = document.getElementById('ejecutivoSelect');
+
+    if (!selectInput) return;
+
+    selectInput.innerHTML = '<option value="">Selecciona un ejecutivo</option>';
+    Object.entries(ejecutivoMap).forEach(([id, data]) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = data.name;
+        selectInput.appendChild(option);
+    });
+}
 
 function cargarCitasFiltradas(id, scope) {
-    console.log("scope: ", scope);
     localStorage.setItem("id_guardado", id);
     localStorage.setItem("scope_guardado", scope);
 
     currentViewId = id;
     currentViewScope = scope;
-
+    
     const startInput = document.getElementById('startDate');
     const endInput = document.getElementById('endDate');
+    const executiveTypeInput = document.getElementById('tipoEjecutivo');
+    
     const startDate = startInput ? startInput.value : '';
     const endDate = endInput ? endInput.value : '';
+    const executiveType = executiveTypeInput ? executiveTypeInput.value : '';
 
-    const url = "administrar-cita.php";
+    const url = "citas/administrar-cita.php";
     let action = "";
-    let requestData = { startDate: startDate, endDate: endDate };
+
+    let requestData = { startDate: startDate, endDate: endDate, tipo: executiveType };
 
     switch (scope) {
-    case 'arbol':
-        requestData.action = "obtener_modificado";
-        requestData.id_arbol = id; 
-        break;
+        case 'arbol':
+            requestData.action = "obtener_modificado";
+            requestData.id_arbol = id; 
+            break;
 
-    case 'plantel':
-        requestData.action = "obtener_by_plantel";
-        requestData.id_arbol = id; 
-        break;
+        case 'plantel':
+            requestData.action = "obtener_by_plantel";
+            requestData.id_arbol = id; 
+            break;
 
-    default:
-        requestData.action = "obtener_eje";
-        requestData.id_eje = id;
-        break;
-}
+        default:
+            requestData.action = "obtener_eje";
+            requestData.id_eje = id;
+            break;
+    }
 
     $.ajax({
         url: url,
@@ -656,9 +691,10 @@ function cargarCitasFiltradas(id, scope) {
                 console.log(scope, response);
                 tableSchema = response.schema;
                 tableData = processData(response.data);
-
+                
                 if (response.ejecutivoMap) {
                     ejecutivoFullMap = response.ejecutivoMap;
+                    insertarUsuariosIntoSelectInput(ejecutivoFullMap);
                 }
 
                 if (response.coloresMap) {
@@ -681,8 +717,6 @@ function cargarCitasFiltradas(id, scope) {
                 } else if (response.conteo_arbol_efectividad){
                     renderConteoEstatusEfectividad(response.conteo_arbol_efectividad);
                 }
-
-
                 
                 const rawComments = obtenerComentarios();
                 poblarComentariosHandsontable(rawComments);
@@ -751,6 +785,7 @@ function initializeDynamicTable() {
         colHeaders: dynamicHeaders,
         columns: dynamicColumns,
         cell: combinedCellConfig,
+        selectionMode: 'single',
         themeName: 'ht-theme-main-dark-auto',
         autoColumnSize: { useHeaders: true },
         autoRowSize: true,
@@ -888,7 +923,7 @@ function initializeDynamicTable() {
 
             if (!value) {
                 $.ajax({
-                    url: 'administrar-comentarios.php',
+                    url: 'citas/administrar-comentarios.php',
                     type: 'POST',
                     data: { action: 'eliminar', id_cita: id_cita, id_row: prop }
                 });
@@ -907,7 +942,7 @@ function initializeDynamicTable() {
                 let comment_aux = exists ? 'modificado' : 'agregado';
 
                 $.ajax({
-                    url: 'administrar-comentarios.php',
+                    url: 'citas/administrar-comentarios.php',
                     type: 'POST',
                     data: {
                         action: action,
@@ -927,6 +962,31 @@ function initializeDynamicTable() {
             }
         }
     });
+
+    // Implementación de toque largo para abrir el menú contextual en dispositivos móviles
+    // Implementación de Práctica 28
+    //_________________________________________________________________________
+
+    //MouseDown
+    hot.addHook('afterOnCellMouseDown', function (event, coords, TD) {
+        if (event.touches || event.type === 'touchstart') {
+            pressTimer = window.setTimeout(function() {
+                hot.selectCell(coords.row, coords.col);
+                hot.getPlugin('contextMenu').open(coords, TD);
+            }, 500);
+        }
+    });
+
+    //MouseUp
+    document.getElementById('citas').addEventListener('touchmove', function() {
+        clearTimeout(pressTimer);
+    });
+
+    document.getElementById('citas').addEventListener('touchend', function() {
+        clearTimeout(pressTimer);
+    });
+
+    //_________________________________________________________________________
 }
 
 socket.onopen = function () {
@@ -1005,7 +1065,7 @@ socket.onmessage = (event) => {
         hot.setDataAtCell(row, id_cita, new_id, 'poblar_id');
         hot.alter('insert_row_above', 0, 1);
         if (currentViewId) cargarCitasFiltradas(currentViewId, currentViewScope);
-
+         $('#arbol_ejecutivos').jstree(true).refresh();
     } else if (message.type === "ELIMINAR_USUARIO") {
         const { usuario, row, type, log } = message;
         isExternalAction = true;
@@ -1112,9 +1172,13 @@ socket.onmessage = (event) => {
         isExternalAction = false;
 
     } else if (message.type === 'PINTAR_CELDA') {
+        if(user === message.user) return;
+        
         const { id_cita, col_prop, color_class, log } = message;
         const rowData = hot.getSourceData();
         const sourceIndex = rowData.findIndex(r => r.id_cita == id_cita);
+        
+        createDialog("messageDialogo", "dialogMessage2", log);
 
         if (sourceIndex !== -1) {
             const visualRow = hot.toVisualRow(sourceIndex);
@@ -1135,7 +1199,6 @@ socket.onmessage = (event) => {
                 }, 1000);
             }
         }
-        createDialog("messageDialogo", "dialogMessage2", log);
     }
     else if (message.type === 'MOVER_EJECUTIVO') {
         if(user === message.user) return;
@@ -1146,6 +1209,12 @@ socket.onmessage = (event) => {
             flashTreeNode(node_id);
         });
         $('#arbol_ejecutivos').jstree(true).refresh();
+    }
+    else if (message.type === 'CARGAR_USUARIO_FORM') {
+        if(user === message.user) return;
+        const { log, planteles } = message;
+        createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
+        // Aquí podrías actualizar tu select de planteles con los datos recibidos
     }
     else if (message.type === 'RENOMBRAR_EJECUTIVO') {
         if(user === message.user) return;
@@ -1169,16 +1238,25 @@ socket.onmessage = (event) => {
         flashTreeNode(node_id);
     }
     else if (message.type === 'ELIMINAR_EJECUTIVO') {
-        if(user === message.user)return
-            
-        const { log, node_id, nombreAsesor } = message;
+        if(user === message.user) return;
+        const { log, node_id } = message;
         const tree = $('#arbol_ejecutivos').jstree(true);
         isTreeExternalAction = true;
         tree.delete_node(node_id);
         isTreeExternalAction = false;
         createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
-        hot.setDataAtCell(hot.getSourceData().findIndex(row => row.nom_eje === nombreAsesor), hot.propToCol('nom_eje'), '', 'loadData');
     }
+    else if(message.type === 'RESTAURAR_CITA'){
+        const { log, row, id_cita } = message;
+        const elements = tableSchema.map(col => col.data);
+        const index_cita = elements.indexOf('id_cita');
+        createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
+        if(hot_eliminadas){
+            hot_eliminadas.alter('remove_row', row);
+
+        }
+        if (currentViewId) cargarCitasFiltradas(currentViewId, currentViewScope);
+    } 
 };
 
 function flashTreeNode(nodeId) {
@@ -1199,7 +1277,7 @@ function refreshTree() {
 
 async function obtenerDatosArbol() {
     try {
-        const response = await fetch('administrar.ejecutivo-arbol.php?action=obtener_arbol');
+        const response = await fetch('ejecutivo/administrar-ejecutivo-arbol.php?action=obtener_arbol');
         
         if (!response.ok) {
             throw new Error(`Error en la red: ${response.status}`);
