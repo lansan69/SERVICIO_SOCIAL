@@ -90,7 +90,6 @@ $(document).ready(function () {
                 },
                 success: function (res) {
                     if (res.success) {
-                        $('#arbol_ejecutivos').jstree(true).refresh();
                         if (res.new_id) {
                             socket.send(JSON.stringify({
                                 type: 'CREAR_EJECUTIVO',
@@ -142,6 +141,14 @@ $(document).ready(function () {
             cargarCitasFiltradas(id, scope);
         } else {
             console.error("Function cargarCitasFiltradas not found in handson.js");
+        }
+    });
+
+    $('#arbol_ejecutivos').on('select_node.jstree', function (e, data) {
+        if (data.node.type === 'ejecutivo') {
+            const id_eje = data.node.id;
+            
+            abrirModalCard(id_eje);
         }
     });
 });

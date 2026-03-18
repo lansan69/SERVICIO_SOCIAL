@@ -29,7 +29,9 @@
                     'name' => $nombre,
                     'tel' => $telefono,
                     'tipo' => isset($executive['rol_eje']) ? $executive['rol_eje'] : "",
-                    'permisos' => $permiso
+                    'permisos' => $permiso,
+                    'padre' => isset($executive['id_padre']) ? $executive['id_padre'] : null,
+                    'foto' => isset($executive['fot_eje']) ? $executive['fot_eje'] : null
                 ];
             }
         }

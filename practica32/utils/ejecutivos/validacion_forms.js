@@ -2,14 +2,14 @@
 function mostrarFormularioEjecutivos() {
     const modalElement = document.getElementById("formularioDialog");
     if (modalElement) {
-        modalElement.showModal(); 
+        modalElement.showModal();
     }
 }
 
 // 1. Preview al seleccionar imagen y pre-validación rápida
-$("#fot_eje").change(function() {
+$("#fot_eje").change(function () {
     const archivo = this.files[0];
-    
+
     // Limpiar preview si no hay archivo
     if (!archivo) {
         $('#preview').hide();
@@ -42,7 +42,7 @@ $("#fot_eje").change(function() {
 function mostrarPreview(input) {
     if (input.files && input.files[0]) {
         var reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function (e) {
             $('#img-preview').attr('src', e.target.result);
             $('#preview').show(); // Esto asume que el contenedor del img tiene id="preview"
         }
@@ -51,21 +51,21 @@ function mostrarPreview(input) {
 }
 
 // 3. Submit del formulario con validaciones
-$("#formularioEjecutivo").submit(function(e) {
+$("#formularioEjecutivo").submit(function (e) {
     e.preventDefault();
-    
+
     // Validar campos de texto
     if (!$("#nom_eje").val().trim()) {
         alert('El nombre es requerido');
         return;
     }
-    
+
     if (!$("#tel_eje").val().trim()) {
         alert('El teléfono es requerido');
         return;
     }
 
-    if(!$("#id_pla").val()) {
+    if (!$("#id_pla").val()) {
         alert('El plantel es requerido');
         return;
     }
@@ -78,7 +78,7 @@ $("#formularioEjecutivo").submit(function(e) {
 function enviarFormulario() {
     var formData = new FormData($('#formularioEjecutivo')[0]);
     formData.append('action', 'agregar_ejecutivo');
-    
+
     $.ajax({
         url: 'ejecutivo/administrar-ejecutivo.php', // Asegúrate de que esta ruta sea correcta
         type: 'POST',
@@ -86,35 +86,57 @@ function enviarFormulario() {
         processData: false,
         contentType: false,
         dataType: 'json',
-        beforeSend: function() {
+        beforeSend: function () {
             // Deshabilitar botón para evitar doble envío
             $('#formularioEjecutivo button[type="submit"]').prop('disabled', true).text('Guardando...');
         },
-        success: function(response) {
+        success: function (response) {
             if (response.success) {
                 // Cerrar el <dialog> nativo
                 document.getElementById('formularioDialog').close();
 
+                console.log(response);
+                const arbol = $('#arbol_ejecutivos').jstree(true);
+
+                const text_arbol = response.data.nom_eje + 
+                    "<span style='color:#ccc;'>|</span>" + 
+                    "<span class='badge-click' data-id='{$id}' data-scope='padre' style='display: inline-block; background-color: white; border: 1px solid; border-radius: 50%; width: 20px; height: 20px; line-height: 11px; text-align: center; padding: 0; padding-top: 2.5px; font-size: 12px; font-weight: bold; vertical-align: middle; cursor: pointer;'>0</span>" + 
+                    "<span style='color:#ccc;'>|</span>" + 
+                    "<span class='badge-click' data-id='{$id}' data-scope='arbol' style='display: inline-block; background-color: purple; color: white; border: 1px solid; border-radius: 50%; width: 20px; height: 20px; line-height: 11px; text-align: center; padding: 0; padding-top: 2.5px; font-size: 12px; font-weight: bold; vertical-align: middle; cursor: pointer;'>0</span>";
+
+                arbol.create_node(response.data.id_pla, {
+                    "id": response.data.id,
+                    "text": text_arbol,
+                    "type": "ejecutivo",
+                    "icon": "ejecutivo/uploads/" + response.data.RUTA_IMAGEN
+                }, "last");
+
+                console.log(response);
+                socket.send(JSON.stringify({
+                    type: 'CREAR_EJECUTIVO',
+                    log: "Se creó un nuevo nodo",
+                    user: user,
+                    node_id: response.data.id,
+                    parent_id: response.data.id_pla,
+                    text: text_arbol,
+                    node_type: "ejecutivo",
+                    icon: "ejecutivo/uploads/" + response.data.RUTA_IMAGEN
+                }));
+
                 createDialog("messageDialogo", "dialogMessage2", response.message);
                 limpiarFormulario();
 
-                socket.send(JSON.stringify({
-                    type: 'CARGAR_USUARIO_FORM',
-                    log: `Se cargó nuevo ejecutivo: ${response.data.nom_eje} con ID ${response.data.id_eje} en el plantel ${response.data.plantel}`,
-                    user: user
-                }));
-                
                 // Aquí podrías llamar a una función para recargar tu Handsontable
                 // ej: cargarDatosHandsontable();
             } else {
                 alert('Error: ' + response.message);
             }
         },
-        error: function(xhr, status, error) {
+        error: function (xhr, status, error) {
             console.error(error);
             alert('Error de conexión al guardar el ejecutivo');
         },
-        complete: function() {
+        complete: function () {
             // Restaurar botón
             $('#formularioEjecutivo button[type="submit"]').prop('disabled', false).text('Guardar');
         }

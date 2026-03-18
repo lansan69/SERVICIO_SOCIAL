@@ -1228,14 +1228,14 @@ socket.onmessage = (event) => {
     }
     else if (message.type === 'CREAR_EJECUTIVO') {
         if(user === message.user) return;
-        const { log, node_id, parent_id, text, node_type } = message;
+        const { log, node_id, parent_id, text, node_type, icon } = message;
         const tree = $('#arbol_ejecutivos').jstree(true);
         isTreeExternalAction = true;
-        tree.create_node(parent_id, { id: node_id, text: text, type: node_type });
+
+        tree.create_node(parent_id, { id: node_id, text: text, type: node_type, icon:icon });
+        
         isTreeExternalAction = false;
-        tree.refresh();
         createDialog("messageDialogo", "dialogMessage2", log + " usuario: " + user);
-        flashTreeNode(node_id);
     }
     else if (message.type === 'ELIMINAR_EJECUTIVO') {
         if(user === message.user) return;

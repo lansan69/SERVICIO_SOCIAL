@@ -76,9 +76,8 @@
                 Organigrama de Ejecutivos
             </h5>
             <hr>
-            <button id="btnFormExecutives" 
-            class="btn btn-primary btn-sm shadow-sm d-flex align-items-center"
-            onclick="mostrarFormularioEjecutivos()">
+            <button id="btnFormExecutives" class="btn btn-primary btn-sm shadow-sm d-flex align-items-center"
+                onclick="mostrarFormularioEjecutivos()">
                 <span class="material-icons me-1" style="font-size: 16px;"></span>
                 Agregar un ejecutivo
             </button>
@@ -96,6 +95,17 @@
             </div>
             <div class="tabla_eliminadas">
                 <?php include 'templates_html/ejecutivos/form.html'; ?>
+            </div>
+        </dialog>
+
+        <dialog id="ejecutivoInfo" class="dialog-eliminadas">
+            <div class="dialog-header d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Información del Ejecutivo</h5>
+                <button type="button" class="btn-close"
+                    onclick="document.getElementById('ejecutivoInfo').close()"></button>
+            </div>
+            <div class="tabla_eliminadas d-flex justify-content-center align-items-center">
+                <?php include 'templates_html/ejecutivos/card_ejecutivo.html'; ?>
             </div>
         </dialog>
 
@@ -268,4 +278,6 @@
 <script src="citas/eliminadas.js"></script>
 <script src="utils/ejecutivos/validacion_forms.js"></script>
 <script src="utils/ejecutivos/poblar_plantel.js"></script>
+<script src="ejecutivo/handsontables/handsonCard.js"></script>
+<script src="utils/ejecutivos/modal.js"></script>
 </html>

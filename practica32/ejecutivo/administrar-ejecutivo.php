@@ -258,10 +258,12 @@ switch ($action) {
 
         $plantel_nombre = isset($plantelMap[$plantel]) ? $plantelMap[$plantel] : '';
         echo respuestaExito([
+            'success' => true,
             'id' => $nuevo_id, 
             'nom_eje' => $nom_eje,
             'id_eje' => $nuevo_id,
             'plantel' => $plantel_nombre,
+            'id_pla' => $plantel,
             'RUTA_IMAGEN' => isset($fot_eje) ? $fot_eje : null,
         ], 'Ejecutivo creado correctamente');
 
